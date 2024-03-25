@@ -40,10 +40,35 @@ func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, 
 			Object:   key.Object,
 		},
 	})
-	if err != nil {
-		return false, err
-	}
-	return res.Allowed, nil
+	return res.GetAllowed(), err
+}
+
+func (m *model) Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error) {
+	res, err := m.s.c.c.Read(ctx, &openfgav1.ReadRequest{
+		StoreId:  m.s.id,
+		TupleKey: &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
+	})
+	return res.GetTuples(), err
+}
+
+func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error) {
+	res, err := m.s.c.c.Expand(ctx, &openfgav1.ExpandRequest{
+		StoreId:              m.s.id,
+		TupleKey:             &openfgav1.ExpandRequestTupleKey{Relation: relation, Object: object},
+		AuthorizationModelId: m.id,
+	})
+	return res.GetTree(), err
+}
+
+func (m *model) List(ctx context.Context, typ, relation, user string) ([]string, error) {
+	res, err := m.s.c.c.ListObjects(ctx, &openfgav1.ListObjectsRequest{
+		StoreId:              m.s.id,
+		AuthorizationModelId: m.id,
+		Type:                 typ,
+		Relation:             relation,
+		User:                 user,
+	})
+	return res.GetObjects(), err
 }
 
 func (m *model) Write(ctx context.Context, object, relation, user string) error {

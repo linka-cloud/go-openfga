@@ -6,6 +6,7 @@ import (
 
 	"github.com/openfga/openfga/pkg/server"
 	"github.com/openfga/openfga/pkg/storage/memory"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +60,7 @@ func TestServer(t *testing.T) {
 	s, err := f.CreateStore(ctx, "default")
 	require.NoError(t, err)
 	require.NotEmpty(t, s.ID())
-	require.Equal(t, "default", s.Name())
+	assert.Equal(t, "default", s.Name())
 	_, err = s.AuthorizationModel(ctx, "")
 	require.Error(t, err)
 	m, err := s.WriteAuthorizationModel(ctx, dsl)
@@ -68,12 +69,20 @@ func TestServer(t *testing.T) {
 	require.NotNil(t, m.Store())
 	m2, err := s.LastAuthorizationModel(ctx)
 	require.NoError(t, err)
-	require.Equal(t, m.ID(), m2.ID())
+	assert.Equal(t, m.ID(), m2.ID())
 	require.NoError(t, m.Write(ctx, Doc.Ref("doc1"), "owner", User.Ref("user1")))
 	ok, err := m.Check(ctx, Doc.Ref("doc1"), "can_write", User.Ref("user1"))
 	require.NoError(t, err)
-	require.True(t, ok)
+	assert.True(t, ok)
 	ok, err = m.Check(ctx, Doc.Ref("doc1"), "can_write", User.Ref("user2"))
 	require.NoError(t, err)
-	require.False(t, ok)
+	assert.False(t, ok)
+	tree, err := m.Expand(ctx, Doc.Ref("doc1"), "owner")
+	require.NoError(t, err)
+	require.Len(t, tree.GetRoot().GetLeaf().GetUsers().GetUsers(), 1)
+	assert.Equal(t, User.Ref("user1"), tree.GetRoot().GetLeaf().GetUsers().GetUsers()[0])
+	objs, err := m.List(ctx, "doc", "can_write", User.Ref("user1"))
+	require.NoError(t, err)
+	require.Len(t, objs, 1)
+	assert.Equal(t, Doc.Ref("doc1"), objs[0])
 }

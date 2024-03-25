@@ -16,10 +16,12 @@ package openfga
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Reference interface {
 	Ref(id string) string
+	IDs(refs ...string) ([]string, error)
 }
 
 func NewReference(res string) Reference {
@@ -30,6 +32,16 @@ type identifier string
 
 func (i identifier) Ref(id string) string {
 	return fmt.Sprintf("%s:%s", string(i), id)
+}
+
+func (i identifier) IDs(refs ...string) (out []string, err error) {
+	for _, ref := range refs {
+		if !strings.HasPrefix(ref, string(i)+":") {
+			return nil, fmt.Errorf("invalid reference: %s for %s", ref, i)
+		}
+		out = append(out, strings.TrimPrefix(ref, string(i)+":"))
+	}
+	return
 }
 
 func NewReferenceWithRelation(res, rel string) Reference {
@@ -43,4 +55,17 @@ type identifierWithRelation struct {
 
 func (i identifierWithRelation) Ref(id string) string {
 	return fmt.Sprintf("%s:%s#%s", i.res, id, i.rel)
+}
+
+func (i identifierWithRelation) IDs(refs ...string) (out []string, err error) {
+	for _, ref := range refs {
+		if !strings.HasPrefix(ref, i.res+":") {
+			return nil, fmt.Errorf("invalid reference: %s for %s#%s", ref, i.res, i.rel)
+		}
+		if !strings.HasSuffix(ref, "#"+i.rel) {
+			return nil, fmt.Errorf("invalid reference: %s for %s#%s", ref, i.res, i.rel)
+		}
+		out = append(out, strings.Split(strings.TrimPrefix(ref, i.res+":"), "#")[0])
+	}
+	return
 }

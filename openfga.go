@@ -38,13 +38,16 @@ type Model interface {
 	ID() string
 	Store() Store
 
+	Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error)
+	Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error)
+	List(ctx context.Context, typ, relation, user string) ([]string, error)
+	Tx() Tx
+	Check(ctx context.Context, object, relation, user string) (bool, error)
+	CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error)
 	Write(ctx context.Context, object, relation, user string) error
 	WriteTuples(context.Context, ...*openfgav1.TupleKey) error
 	Delete(ctx context.Context, object, relation, user string) error
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
-	Tx() Tx
-	Check(ctx context.Context, object, relation, user string) (bool, error)
-	CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error)
 }
 
 type Tx interface {
