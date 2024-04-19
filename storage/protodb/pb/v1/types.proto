@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package linka.cloud.openfga.protodb.pb.v1;
+
+option go_package = "go.linka.cloud/openfga/storage/protodb/pb/v1;pbv1";
+
+import "google/protobuf/timestamp.proto";
+import "openfga/v1/openfga.proto";
+import "openfga/v1/openfga_service.proto";
+import "openfga/v1/authzmodel.proto";
+
+message Tuple {
+  // key will have format "store_id/tupple_key.object#tupple_key.relation@tupple_key.user"
+  string key = 1;
+  string store_id = 2;
+  .openfga.v1.TupleKey tuple_key = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message Assertions {
+  // key will have format "store_id/tupple_key.object#tupple_key.relation@tupple_key.user"
+  string key = 1;
+  string store_id = 2;
+  string model_id = 3;
+  repeated .openfga.v1.Assertion assertions = 4;
+}
+
+message Model {
+  string key = 1;
+  string store_id = 2;
+  .openfga.v1.AuthorizationModel model = 3;
+}
+
+message Change {
+  string key = 1;
+  string store_id = 2;
+  .openfga.v1.TupleChange change = 3;
+}
