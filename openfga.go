@@ -5,8 +5,14 @@ import (
 	"time"
 
 	"github.com/fullstorydev/grpchan/inprocgrpc"
+	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
+	"github.com/openfga/openfga/pkg/middleware/requestid"
+	"github.com/openfga/openfga/pkg/middleware/storeid"
+	"github.com/openfga/openfga/pkg/middleware/validator"
 	"github.com/openfga/openfga/pkg/server"
+	"google.golang.org/grpc"
 )
 
 type FGA interface {
@@ -70,6 +76,24 @@ func New(opts ...server.OpenFGAServiceV1Option) (FGA, error) {
 		return nil, err
 	}
 	ch := &inprocgrpc.Channel{}
+	ch.WithServerUnaryInterceptor(
+		grpcmiddleware.ChainUnaryServer(
+			grpc_ctxtags.UnaryServerInterceptor(), // needed for logging
+			requestid.NewUnaryInterceptor(),       // add request_id to ctxtags
+			storeid.NewUnaryInterceptor(),         // if available, add store_id to ctxtags
+			// logging.NewLoggingInterceptor(s.Logger), // needed to log invalid requests
+			validator.UnaryServerInterceptor(),
+		),
+	)
+	ch.WithServerStreamInterceptor(
+		grpcmiddleware.ChainStreamServer(
+			[]grpc.StreamServerInterceptor{
+				requestid.NewStreamingInterceptor(),
+				validator.StreamServerInterceptor(),
+				grpc_ctxtags.StreamServerInterceptor(),
+			}...,
+		),
+	)
 	openfgav1.RegisterOpenFGAServiceServer(ch, s)
 	return &fga{s: s, Client: &client{c: openfgav1.NewOpenFGAServiceClient(ch)}}, nil
 }
