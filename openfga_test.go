@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/openfga/openfga/pkg/server"
-	"github.com/openfga/openfga/pkg/storage/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	protodb2 "go.linka.cloud/protodb"
+
+	"go.linka.cloud/go-openfga/storage/protodb"
 )
 
 const dsl = `model
@@ -101,8 +103,9 @@ func TestServer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mem := memory.New()
-	f, err := New(server.WithDatastore(mem))
+	db, err := protodb.New(ctx, protodb2.WithInMemory(true))
+	require.NoError(t, err)
+	f, err := New(server.WithDatastore(db))
 	require.NoError(t, err)
 	defer f.Close()
 
