@@ -49,8 +49,11 @@ type Model interface {
 	List(ctx context.Context, typ, relation, user string) ([]string, error)
 	Tx() Tx
 	Check(ctx context.Context, object, relation, user string) (bool, error)
+	CheckWithContext(ctx context.Context, object, relation, user string, kv ...any) (bool, error)
 	CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error)
+	CheckTupleWithContext(ctx context.Context, key *openfgav1.TupleKey, kv ...any) (bool, error)
 	Write(ctx context.Context, object, relation, user string) error
+	WriteWithCondition(ctx context.Context, object, relation, user string, condition string, kv ...any) error
 	WriteTuples(context.Context, ...*openfgav1.TupleKey) error
 	Delete(ctx context.Context, object, relation, user string) error
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
@@ -59,6 +62,7 @@ type Model interface {
 type Tx interface {
 	Write(object, relation, user string) error
 	WriteTuples(...*openfgav1.TupleKey) error
+	WriteWithCondition(object, relation, user string, condition string, kv ...any) error
 	Delete(object, relation, user string) error
 	DeleteTuples(...*openfgav1.TupleKey) error
 	Commit(ctx context.Context) error

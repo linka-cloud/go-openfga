@@ -17,6 +17,7 @@ package openfga
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
@@ -34,6 +35,14 @@ type tx struct {
 
 func (t *tx) Write(object, relation, user string) error {
 	return t.WriteTuples(tuple.NewTupleKey(object, relation, user))
+}
+
+func (t *tx) WriteWithCondition(object, relation, user string, condition string, kv ...any) error {
+	c, err := makeContext(kv...)
+	if err != nil {
+		return fmt.Errorf("invalid condition: %w", err)
+	}
+	return t.WriteTuples(tuple.NewTupleKeyWithCondition(object, relation, user, condition, c))
 }
 
 func (t *tx) WriteTuples(data ...*openfgav1.TupleKey) error {

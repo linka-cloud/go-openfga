@@ -24,7 +24,7 @@ type folder
     define can_create_file: owner
     define owner: [user]
     define parent: [folder]
-    define viewer: [user, user:*, group#member] or owner or viewer from parent
+    define viewer: [user with non_expired_grant, group#member] or owner or viewer from parent
 
 type doc
   relations
@@ -33,8 +33,12 @@ type doc
     define parent: [folder]
     define can_read: viewer or owner or viewer from parent
     define can_share: owner or owner from parent
-    define viewer: [user, user:*, group#member]
+    define viewer: [user with non_expired_grant, group#member]
     define can_write: owner or owner from parent
+
+condition non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) {
+  current_time < grant_time + grant_duration
+}
 `
 
 var (
@@ -43,6 +47,54 @@ var (
 	GroupMembers = NewReferenceWithRelation("group", "member")
 	Doc          = NewReference("doc")
 	Folder       = NewReference("folder")
+
+	GroupRelations = struct {
+		Member string
+	}{
+		Member: "member",
+	}
+
+	FolderRelations = struct {
+		CanCreateFile string
+		Owner         string
+		Parent        string
+		Viewer        string
+	}{
+		CanCreateFile: "can_create_file",
+		Owner:         "owner",
+		Parent:        "parent",
+		Viewer:        "viewer",
+	}
+
+	DocRelations = struct {
+		CanChangeOwner string
+		Owner          string
+		Parent         string
+		CanRead        string
+		CanShare       string
+		Viewer         string
+		CanWrite       string
+	}{
+		CanChangeOwner: "can_change_owner",
+		Owner:          "owner",
+		Parent:         "parent",
+		CanRead:        "can_read",
+		CanShare:       "can_share",
+		Viewer:         "viewer",
+		CanWrite:       "can_write",
+	}
+
+	ExpiringGrant = struct {
+		Name     string
+		Current  string
+		Time     string
+		Duration string
+	}{
+		Name:     "non_expired_grant",
+		Current:  "current_time",
+		Time:     "grant_time",
+		Duration: "grant_duration",
+	}
 )
 
 func TestServer(t *testing.T) {
@@ -70,19 +122,27 @@ func TestServer(t *testing.T) {
 	m2, err := s.LastAuthorizationModel(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, m.ID(), m2.ID())
-	require.NoError(t, m.Write(ctx, Doc.Ref("doc1"), "owner", User.Ref("user1")))
-	ok, err := m.Check(ctx, Doc.Ref("doc1"), "can_write", User.Ref("user1"))
+	require.NoError(t, m.Write(ctx, Doc.Ref("doc1"), DocRelations.Owner, User.Ref("user1")))
+	ok, err := m.Check(ctx, Doc.Ref("doc1"), DocRelations.CanWrite, User.Ref("user1"))
 	require.NoError(t, err)
 	assert.True(t, ok)
-	ok, err = m.Check(ctx, Doc.Ref("doc1"), "can_write", User.Ref("user2"))
+	ok, err = m.Check(ctx, Doc.Ref("doc1"), DocRelations.CanWrite, User.Ref("user2"))
 	require.NoError(t, err)
 	assert.False(t, ok)
-	tree, err := m.Expand(ctx, Doc.Ref("doc1"), "owner")
+	tree, err := m.Expand(ctx, Doc.Ref("doc1"), DocRelations.Owner)
 	require.NoError(t, err)
 	require.Len(t, tree.GetRoot().GetLeaf().GetUsers().GetUsers(), 1)
 	assert.Equal(t, User.Ref("user1"), tree.GetRoot().GetLeaf().GetUsers().GetUsers()[0])
-	objs, err := m.List(ctx, "doc", "can_write", User.Ref("user1"))
+	objs, err := m.List(ctx, "doc", DocRelations.CanWrite, User.Ref("user1"))
 	require.NoError(t, err)
 	require.Len(t, objs, 1)
 	assert.Equal(t, Doc.Ref("doc1"), objs[0])
+	require.NoError(t, m.WriteWithCondition(ctx, Doc.Ref("doc1"), DocRelations.Viewer, User.Ref("user2"), ExpiringGrant.Name, ExpiringGrant.Time, "2024-01-01T00:00:00Z", ExpiringGrant.Duration, "10m"))
+	ok, err = m.CheckWithContext(ctx, Doc.Ref("doc1"), DocRelations.CanRead, User.Ref("user2"), ExpiringGrant.Current, "2024-01-01T00:00:00Z")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	ok, err = m.CheckWithContext(ctx, Doc.Ref("doc1"), DocRelations.CanRead, User.Ref("user2"), ExpiringGrant.Current, "2024-01-01T00:11:00Z")
+	require.NoError(t, err)
+	assert.False(t, ok)
+	require.NoError(t, m.Delete(ctx, Doc.Ref("doc1"), DocRelations.Viewer, User.Ref("user2")))
 }

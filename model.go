@@ -16,9 +16,11 @@ package openfga
 
 import (
 	"context"
+	"fmt"
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	"github.com/openfga/openfga/pkg/tuple"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type model struct {
@@ -30,6 +32,10 @@ func (m *model) Check(ctx context.Context, object, relation, user string) (bool,
 	return m.CheckTuple(ctx, tuple.NewTupleKey(object, relation, user))
 }
 
+func (m *model) CheckWithContext(ctx context.Context, object, relation, user string, kv ...any) (bool, error) {
+	return m.CheckTupleWithContext(ctx, tuple.NewTupleKey(object, relation, user), kv...)
+}
+
 func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error) {
 	res, err := m.s.c.c.Check(ctx, &openfgav1.CheckRequest{
 		StoreId:              m.s.id,
@@ -39,6 +45,24 @@ func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, 
 			Relation: key.Relation,
 			Object:   key.Object,
 		},
+	})
+	return res.GetAllowed(), err
+}
+
+func (m *model) CheckTupleWithContext(ctx context.Context, key *openfgav1.TupleKey, kv ...any) (bool, error) {
+	c, err := makeContext(kv...)
+	if err != nil {
+		return false, err
+	}
+	res, err := m.s.c.c.Check(ctx, &openfgav1.CheckRequest{
+		StoreId:              m.s.id,
+		AuthorizationModelId: m.id,
+		TupleKey: &openfgav1.CheckRequestTupleKey{
+			User:     key.User,
+			Relation: key.Relation,
+			Object:   key.Object,
+		},
+		Context: c,
 	})
 	return res.GetAllowed(), err
 }
@@ -88,6 +112,15 @@ func (m *model) WriteTuples(ctx context.Context, keys ...*openfgav1.TupleKey) er
 	return tx.Commit(ctx)
 }
 
+func (m *model) WriteWithCondition(ctx context.Context, object, relation, user string, condition string, kv ...any) error {
+	tx := m.Tx()
+	defer tx.Close()
+	if err := tx.WriteWithCondition(object, relation, user, condition, kv...); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (m *model) DeleteTuples(ctx context.Context, keys ...*openfgav1.TupleKey) error {
 	tx := m.Tx()
 	defer tx.Close()
@@ -107,4 +140,16 @@ func (m *model) ID() string {
 
 func (m *model) Store() Store {
 	return m.s
+}
+
+func makeContext(kv ...any) (*structpb.Struct, error) {
+	m := make(map[string]any)
+	for i := 0; i < len(kv); i += 2 {
+		k, ok := kv[i].(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key %v: must be string", kv[i])
+		}
+		m[k] = kv[i+1]
+	}
+	return structpb.NewStruct(m)
 }
