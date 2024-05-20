@@ -96,7 +96,7 @@ func (t *tx) Commit(ctx context.Context) error {
 		StoreId:              t.m.s.id,
 		Writes:               w,
 		Deletes:              d,
-		AuthorizationModelId: t.m.id,
+		AuthorizationModelId: t.m.m.Id,
 	})
 	return err
 }

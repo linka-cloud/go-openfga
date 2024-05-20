@@ -29,14 +29,14 @@ type folder
 type doc
   relations
     define can_change_owner: owner
-    define owner: [user, group]
-    define parent: [folder]
     define can_read: viewer or owner or viewer from parent
     define can_share: owner or owner from parent
-    define viewer: [user with non_expired_grant, group#member]
     define can_write: owner or owner from parent
+    define owner: [user, group]
+    define parent: [folder]
+    define viewer: [user with non_expired_grant, group#member]
 
-condition non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) {
+condition non_expired_grant(current_time: timestamp, grant_duration: duration, grant_time: timestamp) {
   current_time < grant_time + grant_duration
 }
 `
@@ -119,6 +119,9 @@ func TestServer(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, m.ID())
 	require.NotNil(t, m.Store())
+	dsl2, err := m.Show()
+	require.NoError(t, err)
+	assert.Equal(t, dsl, dsl2)
 	m2, err := s.LastAuthorizationModel(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, m.ID(), m2.ID())

@@ -43,6 +43,7 @@ type Store interface {
 type Model interface {
 	ID() string
 	Store() Store
+	Show() (string, error)
 
 	Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error)
 	Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error)

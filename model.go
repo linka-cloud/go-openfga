@@ -19,13 +19,14 @@ import (
 	"fmt"
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
+	parser "github.com/openfga/language/pkg/go/transformer"
 	"github.com/openfga/openfga/pkg/tuple"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type model struct {
-	id string
-	s  *store
+	m *openfgav1.AuthorizationModel
+	s *store
 }
 
 func (m *model) Check(ctx context.Context, object, relation, user string) (bool, error) {
@@ -39,7 +40,7 @@ func (m *model) CheckWithContext(ctx context.Context, object, relation, user str
 func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error) {
 	res, err := m.s.c.c.Check(ctx, &openfgav1.CheckRequest{
 		StoreId:              m.s.id,
-		AuthorizationModelId: m.id,
+		AuthorizationModelId: m.m.Id,
 		TupleKey: &openfgav1.CheckRequestTupleKey{
 			User:     key.User,
 			Relation: key.Relation,
@@ -56,7 +57,7 @@ func (m *model) CheckTupleWithContext(ctx context.Context, key *openfgav1.TupleK
 	}
 	res, err := m.s.c.c.Check(ctx, &openfgav1.CheckRequest{
 		StoreId:              m.s.id,
-		AuthorizationModelId: m.id,
+		AuthorizationModelId: m.m.Id,
 		TupleKey: &openfgav1.CheckRequestTupleKey{
 			User:     key.User,
 			Relation: key.Relation,
@@ -79,7 +80,7 @@ func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1
 	res, err := m.s.c.c.Expand(ctx, &openfgav1.ExpandRequest{
 		StoreId:              m.s.id,
 		TupleKey:             &openfgav1.ExpandRequestTupleKey{Relation: relation, Object: object},
-		AuthorizationModelId: m.id,
+		AuthorizationModelId: m.m.Id,
 	})
 	return res.GetTree(), err
 }
@@ -87,7 +88,7 @@ func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1
 func (m *model) List(ctx context.Context, typ, relation, user string) ([]string, error) {
 	res, err := m.s.c.c.ListObjects(ctx, &openfgav1.ListObjectsRequest{
 		StoreId:              m.s.id,
-		AuthorizationModelId: m.id,
+		AuthorizationModelId: m.m.Id,
 		Type:                 typ,
 		Relation:             relation,
 		User:                 user,
@@ -135,11 +136,15 @@ func (m *model) Tx() Tx {
 }
 
 func (m *model) ID() string {
-	return m.id
+	return m.m.Id
 }
 
 func (m *model) Store() Store {
 	return m.s
+}
+
+func (m *model) Show() (string, error) {
+	return parser.TransformJSONProtoToDSL(m.m, parser.WithIncludeSourceInformation(true))
 }
 
 func makeContext(kv ...any) (*structpb.Struct, error) {

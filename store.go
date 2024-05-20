@@ -49,11 +49,11 @@ func (s *store) UpdatedAt() time.Time {
 }
 
 func (s *store) AuthorizationModel(ctx context.Context, id string) (Model, error) {
-	m, err := s.c.c.ReadAuthorizationModel(ctx, &openfgav1.ReadAuthorizationModelRequest{StoreId: s.id, Id: id})
+	res, err := s.c.c.ReadAuthorizationModel(ctx, &openfgav1.ReadAuthorizationModelRequest{StoreId: s.id, Id: id})
 	if err != nil {
 		return nil, err
 	}
-	return &model{id: m.AuthorizationModel.Id, s: s}, nil
+	return &model{m: res.AuthorizationModel, s: s}, nil
 }
 
 func (s *store) ListAuthorizationModels(ctx context.Context) ([]Model, error) {
@@ -63,7 +63,7 @@ func (s *store) ListAuthorizationModels(ctx context.Context) ([]Model, error) {
 	}
 	var models []Model
 	for _, m := range res.AuthorizationModels {
-		models = append(models, &model{id: m.Id, s: s})
+		models = append(models, &model{m: m, s: s})
 	}
 	return models, nil
 }
@@ -76,7 +76,7 @@ func (s *store) LastAuthorizationModel(ctx context.Context) (Model, error) {
 	if len(res.AuthorizationModels) == 0 {
 		return nil, errors.New("not found")
 	}
-	return &model{id: res.AuthorizationModels[len(res.AuthorizationModels)-1].Id, s: s}, nil
+	return &model{m: res.AuthorizationModels[len(res.AuthorizationModels)-1], s: s}, nil
 }
 
 func (s *store) WriteAuthorizationModel(ctx context.Context, dsl string) (Model, error) {
@@ -93,5 +93,5 @@ func (s *store) WriteAuthorizationModel(ctx context.Context, dsl string) (Model,
 	if err != nil {
 		return nil, fmt.Errorf("failed to write authorization model: %w", err)
 	}
-	return &model{id: res.AuthorizationModelId, s: s}, nil
+	return s.AuthorizationModel(ctx, res.AuthorizationModelId)
 }
