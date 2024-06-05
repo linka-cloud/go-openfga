@@ -29,29 +29,12 @@ type model struct {
 	s *store
 }
 
-func (m *model) Check(ctx context.Context, object, relation, user string) (bool, error) {
-	return m.CheckTuple(ctx, tuple.NewTupleKey(object, relation, user))
+func (m *model) Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error) {
+	return m.CheckTuple(ctx, tuple.NewTupleKey(object, relation, user), contextKVs...)
 }
 
-func (m *model) CheckWithContext(ctx context.Context, object, relation, user string, kv ...any) (bool, error) {
-	return m.CheckTupleWithContext(ctx, tuple.NewTupleKey(object, relation, user), kv...)
-}
-
-func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error) {
-	res, err := m.s.c.c.Check(ctx, &openfgav1.CheckRequest{
-		StoreId:              m.s.id,
-		AuthorizationModelId: m.m.Id,
-		TupleKey: &openfgav1.CheckRequestTupleKey{
-			User:     key.User,
-			Relation: key.Relation,
-			Object:   key.Object,
-		},
-	})
-	return res.GetAllowed(), err
-}
-
-func (m *model) CheckTupleWithContext(ctx context.Context, key *openfgav1.TupleKey, kv ...any) (bool, error) {
-	c, err := makeContext(kv...)
+func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs ...any) (bool, error) {
+	c, err := makeContext(contextKVs...)
 	if err != nil {
 		return false, err
 	}
@@ -85,7 +68,7 @@ func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1
 	return res.GetTree(), err
 }
 
-func (m *model) List(ctx context.Context, typ, relation, user string) ([]string, error) {
+func (m *model) ListObjects(ctx context.Context, typ, relation, user string) ([]string, error) {
 	res, err := m.s.c.c.ListObjects(ctx, &openfgav1.ListObjectsRequest{
 		StoreId:              m.s.id,
 		AuthorizationModelId: m.m.Id,
@@ -94,6 +77,33 @@ func (m *model) List(ctx context.Context, typ, relation, user string) ([]string,
 		User:                 user,
 	})
 	return res.GetObjects(), err
+}
+
+func (m *model) ListUsers(ctx context.Context, object, relation, userTyp string, contextKVs ...any) ([]string, error) {
+	c, err := makeContext(contextKVs...)
+	if err != nil {
+		return nil, err
+	}
+	typ, id := tuple.SplitObject(object)
+	res, err := m.s.c.c.ListUsers(ctx, &openfgav1.ListUsersRequest{
+		StoreId:              m.s.id,
+		AuthorizationModelId: m.m.Id,
+		Relation:             relation,
+		UserFilters:          []*openfgav1.UserTypeFilter{{Type: userTyp}},
+		Object: &openfgav1.Object{
+			Type: typ,
+			Id:   id,
+		},
+		Context: c,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(res.GetUsers()))
+	for _, u := range res.GetUsers() {
+		out = append(out, tuple.UserProtoToString(u))
+	}
+	return out, err
 }
 
 func (m *model) Write(ctx context.Context, object, relation, user string) error {

@@ -47,12 +47,11 @@ type Model interface {
 
 	Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error)
 	Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error)
-	List(ctx context.Context, typ, relation, user string) ([]string, error)
+	ListObjects(ctx context.Context, typ, relation, user string) ([]string, error)
+	ListUsers(ctx context.Context, object, relation, userTyp string, contextKVs ...any) ([]string, error)
 	Tx() Tx
-	Check(ctx context.Context, object, relation, user string) (bool, error)
-	CheckWithContext(ctx context.Context, object, relation, user string, kv ...any) (bool, error)
-	CheckTuple(ctx context.Context, key *openfgav1.TupleKey) (bool, error)
-	CheckTupleWithContext(ctx context.Context, key *openfgav1.TupleKey, kv ...any) (bool, error)
+	Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error)
+	CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs ...any) (bool, error)
 	Write(ctx context.Context, object, relation, user string) error
 	WriteWithCondition(ctx context.Context, object, relation, user string, condition string, kv ...any) error
 	WriteTuples(context.Context, ...*openfgav1.TupleKey) error

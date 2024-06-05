@@ -22,6 +22,7 @@ import (
 type Reference interface {
 	Ref(id string) string
 	IDs(refs ...string) ([]string, error)
+	Type() string
 }
 
 func NewReference(res string) Reference {
@@ -42,6 +43,10 @@ func (i identifier) IDs(refs ...string) (out []string, err error) {
 		out = append(out, strings.TrimPrefix(ref, string(i)+":"))
 	}
 	return
+}
+
+func (i identifier) Type() string {
+	return string(i)
 }
 
 func NewReferenceWithRelation(res, rel string) Reference {
@@ -68,4 +73,8 @@ func (i identifierWithRelation) IDs(refs ...string) (out []string, err error) {
 		out = append(out, strings.Split(strings.TrimPrefix(ref, i.res+":"), "#")[0])
 	}
 	return
+}
+
+func (i identifierWithRelation) Type() string {
+	return i.res
 }
