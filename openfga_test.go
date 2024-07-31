@@ -102,7 +102,7 @@ func TestServer(t *testing.T) {
 	defer cancel()
 
 	mem := memory.New()
-	f, err := New(server.WithDatastore(mem), server.WithExperimentals(server.ExperimentalEnableListUsers))
+	f, err := New(server.WithDatastore(mem))
 	require.NoError(t, err)
 	defer f.Close()
 
