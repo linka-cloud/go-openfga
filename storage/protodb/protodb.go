@@ -71,14 +71,10 @@ func (p *pdb) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleK
 	return storage.NewStaticTupleIterator(toTuple(ts)), nil
 }
 
-func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, []byte, error) {
-	var typ string
-	if tupleKey != nil {
-		typ, _ = tuple.SplitObject(tupleKey.Object)
-	}
-	tk, err := parseToken(opts.Pagination.From, typ)
+func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
+	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	o := []protodb.GetOption{protodb.WithPaging(&protodb.Paging{Offset: tk.Offset, Limit: uint64(opts.Pagination.PageSize), Token: tk.Continuation})}
 	if tupleKey != nil {
@@ -88,12 +84,12 @@ func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.Tu
 	}
 	ts, info, err := typed.NewStore[pbv1.Tuple](p.db).Get(ctx, &pbv1.Tuple{}, o...)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	if !info.HasNext {
-		return toTuple(ts), nil, nil
+		return toTuple(ts), "", nil
 	}
-	return toTuple(ts), newToken(info.Token, tk.Offset+uint64(len(ts)), typ).Bytes(), nil
+	return toTuple(ts), newToken(info.Token, tk.Offset+uint64(len(ts))).String(), nil
 }
 
 func (p *pdb) ReadUserTuple(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
@@ -225,22 +221,22 @@ func (p *pdb) ReadAuthorizationModel(ctx context.Context, store string, id strin
 	})
 }
 
-func (p *pdb) ReadAuthorizationModels(ctx context.Context, store string, opts storage.ReadAuthorizationModelsOptions) (out []*openfgav1.AuthorizationModel, continuation []byte, err error) {
-	tk, err := parseToken(opts.Pagination.From, modelType)
+func (p *pdb) ReadAuthorizationModels(ctx context.Context, store string, opts storage.ReadAuthorizationModelsOptions) (out []*openfgav1.AuthorizationModel, continuation string, err error) {
+	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	ms, info, err := typed.NewStore[pbv1.Model](p.db).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithPaging(&protodb.Paging{Token: tk.Continuation, Offset: tk.Offset, Limit: uint64(opts.Pagination.PageSize)}), protodb.WithReverse())
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	for _, v := range ms {
 		out = append(out, v.Model)
 	}
 	if !info.HasNext {
-		return out, nil, nil
+		return out, "", nil
 	}
-	return out, newToken(info.Token, tk.Offset+uint64(len(ms)), modelType).Bytes(), nil
+	return out, newToken(info.Token, tk.Offset+uint64(len(ms))).String(), nil
 
 }
 
@@ -329,10 +325,10 @@ func (p *pdb) GetStore(ctx context.Context, id string) (*openfgav1.Store, error)
 	return ss[0], nil
 }
 
-func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([]*openfgav1.Store, []byte, error) {
-	tk, err := parseToken(opts.Pagination.From, storeType)
+func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([]*openfgav1.Store, string, error) {
+	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	ss, info, err := typed.NewStore[openfgav1.Store](p.db).Get(ctx, &openfgav1.Store{}, protodb.WithPaging(&protodb.Paging{
 		Offset: tk.Offset,
@@ -340,12 +336,12 @@ func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([
 		Token:  tk.Continuation,
 	}))
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	if !info.HasNext {
-		return ss, nil, nil
+		return ss, "", nil
 	}
-	return ss, newToken(info.Token, tk.Offset+uint64(len(ss)), storeType).Bytes(), nil
+	return ss, newToken(info.Token, tk.Offset+uint64(len(ss))).String(), nil
 }
 
 func (p *pdb) WriteAssertions(ctx context.Context, store, modelID string, assertions []*openfgav1.Assertion) error {
@@ -364,35 +360,51 @@ func (p *pdb) ReadAssertions(ctx context.Context, store, modelID string) ([]*ope
 	return as[0].Assertions, nil
 }
 
-func (p *pdb) ReadChanges(ctx context.Context, store, objectType string, opts storage.ReadChangesOptions, horizonOffset time.Duration) ([]*openfgav1.TupleChange, []byte, error) {
-	tk, err := parseToken(opts.Pagination.From, objectType)
-	if err != nil {
-		return nil, nil, err
-	}
+func (p *pdb) ReadChanges(ctx context.Context, store string, filter storage.ReadChangesFilter, opts storage.ReadChangesOptions) ([]*openfgav1.TupleChange, string, error) {
 	f := protodb.Where("key").StringHasPrefix(store + "/")
 	// we do not set the horizontal offset in the filter because it may change
-	if objectType != "" {
-		f = f.And("change.tuple_key.object").StringHasPrefix(objectType + ":")
+	if filter.ObjectType != "" {
+		f = f.And("change.tuple_key.object").StringHasPrefix(filter.ObjectType + ":")
 	}
-	cs, info, err := typed.NewStore[pbv1.Change](p.db).Get(ctx, &pbv1.Change{}, protodb.WithFilter(f), protodb.WithPaging(&protodb.Paging{
-		Offset: tk.Offset,
-		Limit:  uint64(opts.Pagination.PageSize),
-		Token:  tk.Continuation,
-	}))
+	from := store + "/" + opts.Pagination.From
+	if opts.Pagination.From != "" {
+		if opts.SortDesc {
+			f = f.And("key").StringInf(from)
+		} else {
+			f = f.And("key").StringSup(from)
+		}
+	}
+	o := []protodb.GetOption{
+		protodb.WithFilter(f),
+		protodb.WithPaging(&protodb.Paging{
+			Limit: uint64(opts.Pagination.PageSize),
+		}),
+	}
+	if opts.SortDesc {
+		o = append(o, protodb.WithReverse())
+	}
+	cs, _, err := typed.NewStore[pbv1.Change](p.db).Get(ctx, &pbv1.Change{}, o...)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
-	var out []*openfgav1.TupleChange
+	var (
+		out  []*openfgav1.TupleChange
+		cont string
+	)
 	for _, v := range cs {
-		if v.Change.Timestamp.AsTime().After(time.Now().Add(-horizonOffset)) {
+		if v.Change.Timestamp.AsTime().After(time.Now().Add(-filter.HorizonOffset)) {
 			continue
 		}
 		out = append(out, v.Change)
+		cont = strings.Split(v.Key, "/")[1]
+		if len(out) == opts.Pagination.PageSize {
+			break
+		}
 	}
 	if len(out) == 0 {
-		return nil, nil, storage.ErrNotFound
+		return nil, "", storage.ErrNotFound
 	}
-	return out, newToken(info.Token, tk.Offset+uint64(len(out)), objectType).Bytes(), nil
+	return out, cont, nil
 }
 
 func (p *pdb) IsReady(ctx context.Context) (storage.ReadinessStatus, error) {
@@ -405,52 +417,32 @@ func (p *pdb) Close() {
 	}
 }
 
-const (
-	storeType = "store"
-	modelType = "model"
-)
-
-func newToken(continuation string, offset uint64, objectType string) *token {
-	return &token{Offset: offset, Continuation: continuation, ObjectType: objectType}
+func newToken(continuation string, offset uint64) *token {
+	return &token{Offset: offset, Continuation: continuation}
 }
 
 type token struct {
 	Offset       uint64
 	Continuation string
-	ObjectType   string
 }
 
-func (t *token) Bytes() []byte {
-	return []byte(fmt.Sprintf("%d:%s:%s", t.Offset, t.Continuation, t.ObjectType))
+func (t *token) String() string {
+	return fmt.Sprintf("%d:%s", t.Offset, t.Continuation)
 }
 
-func (t *token) validate(objectType string) error {
-	if t.ObjectType == "" && t.Offset == 0 {
-		return nil
-	}
-	if t.ObjectType != objectType {
-		return storage.ErrMismatchObjectType
-	}
-	return nil
-}
-
-func parseToken(t string, objectType string) (*token, error) {
+func parseToken(t string) (*token, error) {
 	if len(t) == 0 {
-		return &token{}, (&token{}).validate(objectType)
+		return &token{}, nil
 	}
-	parts := strings.SplitN(t, ":", 3)
-	if len(parts) != 3 {
+	parts := strings.SplitN(t, ":", 2)
+	if len(parts) != 2 {
 		return nil, storage.ErrInvalidContinuationToken
 	}
 	offset, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
 		return nil, storage.ErrInvalidContinuationToken
 	}
-	tk := &token{Offset: offset, Continuation: parts[1], ObjectType: parts[2]}
-	if err := tk.validate(objectType); err != nil {
-		return nil, err
-	}
-	return tk, nil
+	return &token{Offset: offset, Continuation: parts[1]}, nil
 }
 
 func makeFilter(storeID, user, relation, object string) filters.FieldFilterer {

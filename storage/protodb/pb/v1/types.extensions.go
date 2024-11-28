@@ -15,12 +15,9 @@
 package pbv1
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
-	"sync/atomic"
-	"time"
 
+	"github.com/oklog/ulid/v2"
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -58,7 +55,7 @@ func (x *Model) SetKey() *Model {
 
 func NewWriteChange(storeID string, t *Tuple) *Change {
 	return &Change{
-		Key:     fmt.Sprintf("%s/%s", storeID, id()),
+		Key:     fmt.Sprintf("%s/%s", storeID, ulid.MustNew(ulid.Timestamp(t.CreatedAt.AsTime()), ulid.DefaultEntropy()).String()),
 		StoreId: storeID,
 		Change: &openfgav1.TupleChange{
 			TupleKey:  t.TupleKey,
@@ -69,8 +66,9 @@ func NewWriteChange(storeID string, t *Tuple) *Change {
 }
 
 func NewDeleteChange(storeID string, t *Tuple) *Change {
+	ts := timestamppb.Now()
 	return &Change{
-		Key:     fmt.Sprintf("%s/%s", storeID, id()),
+		Key:     fmt.Sprintf("%s/%s", storeID, ulid.MustNew(ulid.Timestamp(ts.AsTime()), ulid.DefaultEntropy()).String()),
 		StoreId: storeID,
 		Change: &openfgav1.TupleChange{
 			TupleKey:  t.TupleKey,
@@ -78,13 +76,4 @@ func NewDeleteChange(storeID string, t *Tuple) *Change {
 			Timestamp: timestamppb.Now(),
 		},
 	}
-}
-
-var counter atomic.Uint64
-
-func id() string {
-	b := make([]byte, 16)
-	binary.BigEndian.PutUint64(b, uint64(time.Now().UnixNano()))
-	binary.BigEndian.PutUint64(b[8:], counter.Add(1))
-	return hex.EncodeToString(b)
 }
