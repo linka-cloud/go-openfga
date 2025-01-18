@@ -16,8 +16,11 @@ package openfga
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	parser "github.com/openfga/language/pkg/go/transformer"
 	"github.com/openfga/openfga/pkg/tuple"
@@ -104,6 +107,60 @@ func (m *model) ListUsers(ctx context.Context, object, relation, userTyp string,
 		out = append(out, tuple.UserProtoToString(u))
 	}
 	return out, err
+}
+
+func (m *model) ListRelations(ctx context.Context, object, user string, relations ...string) ([]string, error) {
+	if len(relations) == 0 {
+		objectType := strings.Split(object, ":")[0]
+		for _, v := range m.m.TypeDefinitions {
+			if v.Type != objectType {
+				continue
+			}
+			for relation := range v.Relations {
+				relations = append(relations, relation)
+			}
+			break
+		}
+	}
+	if len(relations) == 0 {
+		return nil, nil
+	}
+	var items []*openfgav1.BatchCheckItem
+	var keys []string
+	for _, v := range relations {
+		k := uuid.NewString()
+		keys = append(keys, k)
+		items = append(items, &openfgav1.BatchCheckItem{
+			CorrelationId: k,
+			TupleKey: &openfgav1.CheckRequestTupleKey{
+				User:     user,
+				Relation: v,
+				Object:   object,
+			},
+		})
+	}
+	res, err := m.s.c.c.BatchCheck(ctx, &openfgav1.BatchCheckRequest{
+		StoreId:              m.s.id,
+		AuthorizationModelId: m.m.Id,
+		Checks:               items,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Result) != len(relations) {
+		return nil, errors.New("invalid response: relation length mismatch")
+	}
+	out := make([]string, 0, len(relations))
+	for i, v := range keys {
+		vv, ok := res.Result[v]
+		if !ok {
+			return nil, errors.New("invalid response: missing batch check result")
+		}
+		if vv.GetAllowed() {
+			out = append(out, relations[i])
+		}
+	}
+	return out, nil
 }
 
 func (m *model) Write(ctx context.Context, object, relation, user string) error {

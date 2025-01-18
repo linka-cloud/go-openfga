@@ -2,6 +2,7 @@ package openfga
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/openfga/openfga/pkg/server"
@@ -156,5 +157,9 @@ func TestServer(t *testing.T) {
 	require.NoError(t, m.Delete(ctx, Doc.Ref("doc1"), DocRelations.Viewer, User.Ref("user2")))
 	us, err = m.ListUsers(ctx, Doc.Ref("doc1"), DocRelations.CanRead, User.Type(), ExpiringGrant.Current, "2024-01-01T00:00:00Z")
 	require.NoError(t, err)
+	rs, err := m.ListRelations(ctx, Doc.Ref("doc1"), User.Ref("user1"))
+	require.NoError(t, err)
+	slices.Sort(rs)
+	assert.Equal(t, []string{"can_change_owner", "can_read", "can_share", "can_write", "owner"}, rs)
 	assert.Len(t, us, 1)
 }
