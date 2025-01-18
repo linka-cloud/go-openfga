@@ -813,6 +813,8 @@ github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0/go.mod h1:vmVJ0l/dxyfGW6Fm
 github.com/leodido/go-urn v1.2.0/go.mod h1:+8+nEpDfqqsY+g338gtMEUOtuK+4dEMhiQEgxpxOKII=
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=
 github.com/lightstep/lightstep-tracer-go v0.18.1/go.mod h1:jlF1pusYV4pidLvZ+XD0UBX0ZE6WURAspgAczcDHrL4=
+github.com/linka-cloud/openfga v1.8.1-0.20250327154525-206a1552b15d h1:u2tzF5PtrjxKOw5U+NzSoy75hv2OUCvIqqcBcOHMGEY=
+github.com/linka-cloud/openfga v1.8.1-0.20250327154525-206a1552b15d/go.mod h1:VmFpwCvf/qnwHkgCfMqVoVBZ4Vy/hWJIc0suk+/w1oA=
 github.com/lyft/protoc-gen-star v0.6.0/go.mod h1:TGAoBVkt8w7MPG72TrKIu85MIdXwDuzJYeZuUPFPNwA=
 github.com/lyft/protoc-gen-star v0.6.2 h1:DgqBrh0Q/JGHXDZjJaYCWKD/EXLczxplIC0JeElY2iU=
 github.com/lyft/protoc-gen-star v0.6.2/go.mod h1:M0b1EfeJR3f8E3YHKFr9KXWjAB4mrKn6Rm6PPEuJlI0=
@@ -885,8 +887,6 @@ github.com/openfga/api/proto v0.0.0-20250127102726-f9709139a369 h1:wEsCZ4oBuu8Lf
 github.com/openfga/api/proto v0.0.0-20250127102726-f9709139a369/go.mod h1:m74TNgnAAIJ03gfHcx+xaRWnr+IbQy3y/AVNwwCFrC0=
 github.com/openfga/language/pkg/go v0.2.0-beta.2.0.20250220223040-ed0cfba54336 h1:pYuYanFfgYrvDoSu/nnThT9P60mw5Yx7PMEI7FYychM=
 github.com/openfga/language/pkg/go v0.2.0-beta.2.0.20250220223040-ed0cfba54336/go.mod h1:IWRgDIekw3UGSWINwmCALHpMmn6NEJzz6e7KZGm+xQ4=
-github.com/openfga/openfga v1.8.8 h1:LtSc6wUNRSNy/vuF9vVGEBp5yqGLwilVfEJgzVO3L7Q=
-github.com/openfga/openfga v1.8.8/go.mod h1:VmFpwCvf/qnwHkgCfMqVoVBZ4Vy/hWJIc0suk+/w1oA=
 github.com/opentracing-contrib/go-observer v0.0.0-20170622124052-a52f23424492/go.mod h1:Ngi6UdF0k5OKD5t5wlmGhe/EDKPoUM3BXZSSfIuJbis=
 github.com/opentracing/basictracer-go v1.0.0/go.mod h1:QfBfYuafItcjQuMwinw9GhYKwFXS9KnPs5lxoYwgW74=
 github.com/opentracing/opentracing-go v1.0.2/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=

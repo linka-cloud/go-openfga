@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package linka.cloud.openfga.x.pb.v1;
+
+option go_package = "go.linka.cloud/openfga/x/pb/v1;pbv1";
+
+import "openfga/v1/openfga_service.proto";
+
+
+service OpenFGAXService {
+  rpc Tx(stream TxRequest) returns (stream TxResponse);
+}
+
+message TxRequest {
+  bool read_only = 1;
+  oneof request {
+    .openfga.v1.ReadRequest read = 2;
+    .openfga.v1.WriteRequest write = 3;
+    .openfga.v1.CheckRequest check = 4;
+    .openfga.v1.BatchCheckRequest batch_check = 5;
+    .openfga.v1.ExpandRequest expand = 6;
+    .openfga.v1.ReadAuthorizationModelsRequest read_authorization_models = 7;
+    .openfga.v1.ReadAuthorizationModelRequest read_authorization_model = 8;
+    .openfga.v1.WriteAuthorizationModelRequest write_authorization_model = 9;
+    .openfga.v1.WriteAssertionsRequest write_assertions = 10;
+    .openfga.v1.ReadAssertionsRequest read_assertions = 11;
+    .openfga.v1.ReadChangesRequest read_changes = 12;
+    .openfga.v1.CreateStoreRequest create_store = 13;
+    .openfga.v1.UpdateStoreRequest update_store = 14;
+    .openfga.v1.DeleteStoreRequest delete_store = 15;
+    .openfga.v1.GetStoreRequest get_store = 16;
+    .openfga.v1.ListStoresRequest list_stores = 17;
+    .openfga.v1.ListObjectsRequest list_objects = 18;
+    .openfga.v1.ListUsersRequest list_users = 19;
+    CommitRequest commit = 20;
+  }
+}
+
+message TxResponse {
+  oneof response {
+    .openfga.v1.ReadResponse read = 1;
+    .openfga.v1.WriteResponse write = 2;
+    .openfga.v1.CheckResponse check = 3;
+    .openfga.v1.BatchCheckResponse batch_check = 4;
+    .openfga.v1.ExpandResponse expand = 5;
+    .openfga.v1.ReadAuthorizationModelsResponse read_authorization_models = 6;
+    .openfga.v1.ReadAuthorizationModelResponse read_authorization_model = 7;
+    .openfga.v1.WriteAuthorizationModelResponse write_authorization_model = 8;
+    .openfga.v1.WriteAssertionsResponse write_assertions = 9;
+    .openfga.v1.ReadAssertionsResponse read_assertions = 10;
+    .openfga.v1.ReadChangesResponse read_changes = 11;
+    .openfga.v1.CreateStoreResponse create_store = 12;
+    .openfga.v1.UpdateStoreResponse update_store = 13;
+    .openfga.v1.DeleteStoreResponse delete_store = 14;
+    .openfga.v1.GetStoreResponse get_store = 15;
+    .openfga.v1.ListStoresResponse list_stores = 16;
+    .openfga.v1.ListObjectsResponse list_objects = 17;
+    .openfga.v1.ListUsersResponse list_users = 18;
+    CommitResponse commit = 19;
+  }
+}
+
+message CommitRequest { }
+
+message CommitResponse { }

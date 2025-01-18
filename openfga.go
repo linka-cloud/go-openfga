@@ -78,6 +78,10 @@ type fga struct {
 	s *server.Server
 }
 
+func FomClient(c openfgav1.OpenFGAServiceClient) Client {
+	return &client{c: c}
+}
+
 func New(opts ...server.OpenFGAServiceV1Option) (FGA, error) {
 	s, err := server.NewServerWithOpts(opts...)
 	if err != nil {

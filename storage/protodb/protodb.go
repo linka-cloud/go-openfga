@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
@@ -31,12 +32,18 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	xstorage "go.linka.cloud/go-openfga/storage"
 	pbv1 "go.linka.cloud/go-openfga/storage/protodb/pb/v1"
+)
+
+const (
+	maxTuplesPerWrite             = 1000
+	maxTypesPerAuthorizationModel = 1000
 )
 
 var _ storage.OpenFGADatastore = (*pdb)(nil)
 
-func New(ctx context.Context, option ...protodb.Option) (storage.OpenFGADatastore, error) {
+func New(ctx context.Context, option ...protodb.Option) (xstorage.Datastore[protodb.Tx], error) {
 	db, err := protodb.Open(ctx, option...)
 	if err != nil {
 		return nil, err
@@ -45,11 +52,11 @@ func New(ctx context.Context, option ...protodb.Option) (storage.OpenFGADatastor
 
 }
 
-func NewWithClient(ctx context.Context, db protodb.Client) (storage.OpenFGADatastore, error) {
+func NewWithClient(ctx context.Context, db protodb.Client) (xstorage.Datastore[protodb.Tx], error) {
 	return newWithClient(ctx, db, true)
 }
 
-func newWithClient(ctx context.Context, db protodb.Client, external bool) (storage.OpenFGADatastore, error) {
+func newWithClient(ctx context.Context, db protodb.Client, external bool) (xstorage.Datastore[protodb.Tx], error) {
 	for _, v := range []proto.Message{&openfgav1.Store{}, &pbv1.Tuple{}, &pbv1.Assertions{}, &pbv1.Change{}} {
 		if err := db.Register(ctx, v.ProtoReflect().Descriptor().ParentFile()); err != nil {
 			return nil, err
@@ -63,15 +70,172 @@ type pdb struct {
 	external bool
 }
 
-func (p *pdb) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadOptions) (storage.TupleIterator, error) {
-	ts, _, err := typed.NewStore[pbv1.Tuple](p.db).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(makeFilter(store, tupleKey.User, tupleKey.Relation, tupleKey.Object)))
+func (p *pdb) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, options storage.ReadOptions) (storage.TupleIterator, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (storage.TupleIterator, error) {
+		return tx.Read(ctx, store, tupleKey, options)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
+	return withTx3(ctx, p, func(ctx context.Context, tx *tx) ([]*openfgav1.Tuple, string, error) {
+		return tx.ReadPage(ctx, store, tupleKey, opts)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ReadUserTuple(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, options storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (*openfgav1.Tuple, error) {
+		return tx.ReadUserTuple(ctx, store, tupleKey, options)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ReadUsersetTuples(ctx context.Context, store string, filter storage.ReadUsersetTuplesFilter, options storage.ReadUsersetTuplesOptions) (storage.TupleIterator, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (storage.TupleIterator, error) {
+		return tx.ReadUsersetTuples(ctx, store, filter, options)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ReadStartingWithUser(ctx context.Context, store string, filter storage.ReadStartingWithUserFilter, options storage.ReadStartingWithUserOptions) (storage.TupleIterator, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (storage.TupleIterator, error) {
+		return tx.ReadStartingWithUser(ctx, store, filter, options)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes) error {
+	return withTx(ctx, p, func(ctx context.Context, tx *tx) error {
+		return tx.Write(ctx, store, d, w)
+	})
+}
+
+func (p *pdb) MaxTuplesPerWrite() int {
+	return maxTuplesPerWrite
+}
+
+func (p *pdb) ReadAuthorizationModel(ctx context.Context, store string, id string) (*openfgav1.AuthorizationModel, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (*openfgav1.AuthorizationModel, error) {
+		return tx.ReadAuthorizationModel(ctx, store, id)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ReadAuthorizationModels(ctx context.Context, store string, opts storage.ReadAuthorizationModelsOptions) (out []*openfgav1.AuthorizationModel, continuation string, err error) {
+	return withTx3(ctx, p, func(ctx context.Context, tx *tx) ([]*openfgav1.AuthorizationModel, string, error) {
+		return tx.ReadAuthorizationModels(ctx, store, opts)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) FindLatestAuthorizationModel(ctx context.Context, store string) (*openfgav1.AuthorizationModel, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (*openfgav1.AuthorizationModel, error) {
+		return tx.FindLatestAuthorizationModel(ctx, store)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) MaxTypesPerAuthorizationModel() int {
+	return maxTypesPerAuthorizationModel
+}
+
+func (p *pdb) WriteAuthorizationModel(ctx context.Context, store string, model *openfgav1.AuthorizationModel) error {
+	return withTx(ctx, p, func(ctx context.Context, tx *tx) error {
+		return tx.WriteAuthorizationModel(ctx, store, model)
+	})
+}
+
+func (p *pdb) CreateStore(ctx context.Context, store *openfgav1.Store) (*openfgav1.Store, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (*openfgav1.Store, error) {
+		return tx.CreateStore(ctx, store)
+	})
+}
+
+func (p *pdb) DeleteStore(ctx context.Context, id string) error {
+	return withTx(ctx, p, func(ctx context.Context, tx *tx) error {
+		return tx.DeleteStore(ctx, id)
+	})
+}
+
+func (p *pdb) GetStore(ctx context.Context, id string) (*openfgav1.Store, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (*openfgav1.Store, error) {
+		return tx.GetStore(ctx, id)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([]*openfgav1.Store, string, error) {
+	return withTx3(ctx, p, func(ctx context.Context, tx *tx) ([]*openfgav1.Store, string, error) {
+		return tx.ListStores(ctx, opts)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) WriteAssertions(ctx context.Context, store, modelID string, assertions []*openfgav1.Assertion) error {
+	return withTx(ctx, p, func(ctx context.Context, tx *tx) error {
+		return tx.WriteAssertions(ctx, store, modelID, assertions)
+	})
+}
+
+func (p *pdb) ReadAssertions(ctx context.Context, store, modelID string) ([]*openfgav1.Assertion, error) {
+	return withTx2(ctx, p, func(ctx context.Context, tx *tx) ([]*openfgav1.Assertion, error) {
+		return tx.ReadAssertions(ctx, store, modelID)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) ReadChanges(ctx context.Context, store string, filter storage.ReadChangesFilter, opts storage.ReadChangesOptions) ([]*openfgav1.TupleChange, string, error) {
+	return withTx3(ctx, p, func(ctx context.Context, tx *tx) ([]*openfgav1.TupleChange, string, error) {
+		return tx.ReadChanges(ctx, store, filter, opts)
+	}, protodb.WithReadOnly())
+}
+
+func (p *pdb) Close() {
+	if p.external {
+		p.db.Close()
+	}
+}
+
+func (p *pdb) Tx(ctx context.Context, opts ...xstorage.TxOption) (xstorage.Tx[protodb.Tx], error) {
+	var o xstorage.TxOptions
+	for _, v := range opts {
+		v(&o)
+	}
+	var os []protodb.TxOption
+	if o.ReadOnly {
+		os = append(os, protodb.WithReadOnly())
+	}
+	txn, err := p.db.Tx(ctx, os...)
+	if err != nil {
+		return nil, err
+	}
+	return &tx{tx: txn}, nil
+}
+
+func (p *pdb) IsReady(ctx context.Context) (storage.ReadinessStatus, error) {
+	return storage.ReadinessStatus{IsReady: true}, nil
+}
+
+type tx struct {
+	mu sync.Mutex
+	tx protodb.Tx
+}
+
+func (t *tx) Unwrap() protodb.Tx {
+	return t.tx
+}
+
+func (t *tx) MaxTuplesPerWrite() int {
+	return maxTuplesPerWrite
+}
+
+func (t *tx) MaxTypesPerAuthorizationModel() int {
+	return maxTypesPerAuthorizationModel
+}
+
+func (t *tx) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadOptions) (storage.TupleIterator, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(makeFilter(store, tupleKey.User, tupleKey.Relation, tupleKey.Object)))
 	if err != nil {
 		return nil, err
 	}
 	return storage.NewStaticTupleIterator(toTuple(ts)), nil
 }
 
-func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
+func (t *tx) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
 		return nil, "", err
@@ -82,7 +246,7 @@ func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.Tu
 	} else {
 		o = append(o, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(store))))
 	}
-	ts, info, err := typed.NewStore[pbv1.Tuple](p.db).Get(ctx, &pbv1.Tuple{}, o...)
+	ts, info, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, o...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -92,8 +256,10 @@ func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.Tu
 	return toTuple(ts), newToken(info.Token, tk.Offset+uint64(len(ts))).String(), nil
 }
 
-func (p *pdb) ReadUserTuple(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
-	ts, _, err := typed.NewStore[pbv1.Tuple](p.db).Get(ctx, &pbv1.Tuple{Key: pbv1.TupleKey(store, tupleKey)})
+func (t *tx) ReadUserTuple(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{Key: pbv1.TupleKey(store, tupleKey)})
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +269,9 @@ func (p *pdb) ReadUserTuple(ctx context.Context, store string, tupleKey *openfga
 	return &openfgav1.Tuple{Key: ts[0].TupleKey, Timestamp: ts[0].CreatedAt}, nil
 }
 
-func (p *pdb) ReadUsersetTuples(ctx context.Context, store string, filter storage.ReadUsersetTuplesFilter, _ storage.ReadUsersetTuplesOptions) (storage.TupleIterator, error) {
+func (t *tx) ReadUsersetTuples(ctx context.Context, store string, filter storage.ReadUsersetTuplesFilter, _ storage.ReadUsersetTuplesOptions) (storage.TupleIterator, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	prefix := fmt.Sprintf("%s/%s#%s@", store, filter.Object, filter.Relation)
 	var f filters.Builder
 	if len(filter.AllowedUserTypeRestrictions) != 0 {
@@ -121,14 +289,16 @@ func (p *pdb) ReadUsersetTuples(ctx context.Context, store string, filter storag
 	} else {
 		f = protodb.Where("key").StringHasPrefix(prefix)
 	}
-	ts, _, err := typed.NewStore[pbv1.Tuple](p.db).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(f))
+	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(f))
 	if err != nil {
 		return nil, err
 	}
 	return storage.NewStaticTupleIterator(toTuple(ts)), nil
 }
 
-func (p *pdb) ReadStartingWithUser(ctx context.Context, store string, filter storage.ReadStartingWithUserFilter, _ storage.ReadStartingWithUserOptions) (storage.TupleIterator, error) {
+func (t *tx) ReadStartingWithUser(ctx context.Context, store string, filter storage.ReadStartingWithUserFilter, _ storage.ReadStartingWithUserOptions) (storage.TupleIterator, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	// TODO(adphi): handle filter.ObjectIDs
 	var of []filters.Builder
 	if filter.ObjectIDs != nil {
@@ -153,83 +323,82 @@ func (p *pdb) ReadStartingWithUser(ctx context.Context, store string, filter sto
 			}
 		}
 	}
-	ts, _, err := typed.NewStore[pbv1.Tuple](p.db).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(f))
+	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(f))
 	if err != nil {
 		return nil, err
 	}
 	return storage.NewStaticTupleIterator(toTuple(ts)), nil
 }
 
-func (p *pdb) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes) error {
-	return typed.WithTypedTx[pbv1.Tuple](ctx, p.db, func(ctx context.Context, tx typed.Tx[pbv1.Tuple, *pbv1.Tuple]) error {
-		for _, v := range w {
-			t := (&pbv1.Tuple{StoreId: store, TupleKey: v, CreatedAt: timestamppb.Now()}).SetKey()
-			got, _, err := tx.Get(ctx, t)
-			if err != nil {
-				return err
-			}
-			if len(got) != 0 {
-				return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_WRITE)
-			}
-			// don't know why the tests want that...
-			if t.TupleKey.Condition != nil && v.Condition.Context == nil {
-				t.TupleKey.Condition.Context = &structpb.Struct{}
-			}
-			if _, err := tx.Raw().Set(ctx, pbv1.NewWriteChange(store, t)); err != nil {
-				return err
-			}
-			if _, err := tx.Set(ctx, t); err != nil {
-				return err
-			}
-		}
-		for _, v := range d {
-			t := &pbv1.Tuple{Key: pbv1.TupleKey(store, tuple.TupleKeyWithoutConditionToTupleKey(v))}
-			got, _, err := tx.Get(ctx, t)
-			if err != nil {
-				return err
-			}
-			if len(got) == 0 {
-				return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_DELETE)
-			}
-			if err := tx.Delete(ctx, t); err != nil {
-				return err
-			}
-			got[0].TupleKey.Condition = nil
-			if _, err := tx.Raw().Set(ctx, pbv1.NewDeleteChange(store, got[0])); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-func (p *pdb) MaxTuplesPerWrite() int {
-	// TODO(adphi): implement
-	return 100
-}
-
-func (p *pdb) ReadAuthorizationModel(ctx context.Context, store string, id string) (*openfgav1.AuthorizationModel, error) {
-	return typed.WithTypedTx2(ctx, p.db, func(ctx context.Context, tx typed.Tx[pbv1.Model, *pbv1.Model]) (*openfgav1.AuthorizationModel, error) {
-		ms, _, err := tx.Get(ctx, &pbv1.Model{Key: fmt.Sprintf("%s/%s", store, id)})
+func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	tx := typed.NewTx[pbv1.Tuple](t.tx)
+	for _, v := range w {
+		t := (&pbv1.Tuple{StoreId: store, TupleKey: v, CreatedAt: timestamppb.Now()}).SetKey()
+		got, _, err := tx.Get(ctx, t)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if len(ms) == 0 {
-			return nil, storage.ErrNotFound
+		if len(got) != 0 {
+			return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_WRITE)
 		}
-		if len(ms[0].Model.TypeDefinitions) == 0 {
-			return nil, storage.ErrNotFound
+		// don't know why the tests want that...
+		if t.TupleKey.Condition != nil && v.Condition.Context == nil {
+			t.TupleKey.Condition.Context = &structpb.Struct{}
 		}
-		return ms[0].Model, nil
-	})
+		if _, err := tx.Raw().Set(ctx, pbv1.NewWriteChange(store, t)); err != nil {
+			return err
+		}
+		if _, err := tx.Set(ctx, t); err != nil {
+			return err
+		}
+	}
+	for _, v := range d {
+		t := &pbv1.Tuple{Key: pbv1.TupleKey(store, tuple.TupleKeyWithoutConditionToTupleKey(v))}
+		got, _, err := tx.Get(ctx, t)
+		if err != nil {
+			return err
+		}
+		if len(got) == 0 {
+			return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_DELETE)
+		}
+		if err := tx.Delete(ctx, t); err != nil {
+			return err
+		}
+		got[0].TupleKey.Condition = nil
+		if _, err := tx.Raw().Set(ctx, pbv1.NewDeleteChange(store, got[0])); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (p *pdb) ReadAuthorizationModels(ctx context.Context, store string, opts storage.ReadAuthorizationModelsOptions) (out []*openfgav1.AuthorizationModel, continuation string, err error) {
+func (t *tx) ReadAuthorizationModel(ctx context.Context, store string, id string) (*openfgav1.AuthorizationModel, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	tx := typed.NewTx[pbv1.Model](t.tx)
+	ms, _, err := tx.Get(ctx, &pbv1.Model{Key: fmt.Sprintf("%s/%s", store, id)})
+	if err != nil {
+		return nil, err
+	}
+	if len(ms) == 0 {
+		return nil, storage.ErrNotFound
+	}
+	if len(ms[0].Model.TypeDefinitions) == 0 {
+		return nil, storage.ErrNotFound
+	}
+	return ms[0].Model, nil
+}
+
+func (t *tx) ReadAuthorizationModels(ctx context.Context, store string, opts storage.ReadAuthorizationModelsOptions) (out []*openfgav1.AuthorizationModel, continuation string, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
 		return nil, "", err
 	}
-	ms, info, err := typed.NewStore[pbv1.Model](p.db).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithPaging(&protodb.Paging{Token: tk.Continuation, Offset: tk.Offset, Limit: uint64(opts.Pagination.PageSize)}), protodb.WithReverse())
+	ms, info, err := typed.NewTx[pbv1.Model](t.tx).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithPaging(&protodb.Paging{Token: tk.Continuation, Offset: tk.Offset, Limit: uint64(opts.Pagination.PageSize)}), protodb.WithReverse())
 	if err != nil {
 		return nil, "", err
 	}
@@ -243,8 +412,10 @@ func (p *pdb) ReadAuthorizationModels(ctx context.Context, store string, opts st
 
 }
 
-func (p *pdb) FindLatestAuthorizationModel(ctx context.Context, store string) (*openfgav1.AuthorizationModel, error) {
-	ms, _, err := typed.NewStore[pbv1.Model](p.db).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithReverse(), protodb.WithOne())
+func (t *tx) FindLatestAuthorizationModel(ctx context.Context, store string) (*openfgav1.AuthorizationModel, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ms, _, err := typed.NewTx[pbv1.Model](t.tx).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithReverse(), protodb.WithOne())
 	if err != nil {
 		return nil, err
 	}
@@ -254,73 +425,73 @@ func (p *pdb) FindLatestAuthorizationModel(ctx context.Context, store string) (*
 	return ms[0].Model, nil
 }
 
-func (p *pdb) MaxTypesPerAuthorizationModel() int {
-	// TODO implement me
-	return 100
-}
-
-func (p *pdb) WriteAuthorizationModel(ctx context.Context, store string, model *openfgav1.AuthorizationModel) error {
-	_, err := p.db.Set(ctx, (&pbv1.Model{StoreId: store, Model: model}).SetKey())
+func (t *tx) WriteAuthorizationModel(ctx context.Context, store string, model *openfgav1.AuthorizationModel) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, err := t.tx.Set(ctx, (&pbv1.Model{StoreId: store, Model: model}).SetKey())
 	return err
 }
 
-func (p *pdb) CreateStore(ctx context.Context, store *openfgav1.Store) (*openfgav1.Store, error) {
-	return typed.WithTypedTx2[openfgav1.Store, *openfgav1.Store](ctx, p.db, func(ctx context.Context, tx typed.Tx[openfgav1.Store, *openfgav1.Store]) (*openfgav1.Store, error) {
-		ss, _, err := tx.Get(ctx, &openfgav1.Store{Id: store.Id})
-		if err != nil {
-			return nil, err
-		}
-		if len(ss) != 0 {
-			return nil, storage.ErrCollision
-		}
-		store.CreatedAt = timestamppb.Now()
-		store.UpdatedAt = store.CreatedAt
-		return typed.NewStore[openfgav1.Store](p.db).Set(ctx, store)
-	})
+func (t *tx) CreateStore(ctx context.Context, store *openfgav1.Store) (*openfgav1.Store, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	tx := typed.NewTx[openfgav1.Store](t.tx)
+	ss, _, err := tx.Get(ctx, &openfgav1.Store{Id: store.Id})
+	if err != nil {
+		return nil, err
+	}
+	if len(ss) != 0 {
+		return nil, storage.ErrCollision
+	}
+	store.CreatedAt = timestamppb.Now()
+	store.UpdatedAt = store.CreatedAt
+	return typed.NewTx[openfgav1.Store](tx.Raw()).Set(ctx, store)
 }
 
-func (p *pdb) DeleteStore(ctx context.Context, id string) error {
-	return protodb.WithTx(ctx, p.db, func(ctx context.Context, tx protodb.Tx) error {
-		ss, _, err := tx.Get(ctx, &openfgav1.Store{Id: id})
-		if err != nil {
+func (t *tx) DeleteStore(ctx context.Context, id string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ss, _, err := t.tx.Get(ctx, &openfgav1.Store{Id: id})
+	if err != nil {
+		return err
+	}
+	if len(ss) == 0 {
+		return nil
+	}
+	ts, _, err := t.tx.Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
+	if err != nil {
+		return err
+	}
+	for _, v := range ts {
+		if err := t.tx.Delete(ctx, v); err != nil {
 			return err
 		}
-		if len(ss) == 0 {
-			return nil
-		}
-		ts, _, err := tx.Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
-		if err != nil {
+	}
+	cs, _, err := t.tx.Get(ctx, &pbv1.Change{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
+	if err != nil {
+		return err
+	}
+	for _, v := range cs {
+		if err := t.tx.Delete(ctx, v); err != nil {
 			return err
 		}
-		for _, v := range ts {
-			if err := tx.Delete(ctx, v); err != nil {
-				return err
-			}
-		}
-		cs, _, err := tx.Get(ctx, &pbv1.Change{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
-		if err != nil {
+	}
+	as, _, err := t.tx.Get(ctx, &pbv1.Assertions{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
+	if err != nil {
+		return err
+	}
+	for _, v := range as {
+		if err := t.tx.Delete(ctx, v); err != nil {
 			return err
 		}
-		for _, v := range cs {
-			if err := tx.Delete(ctx, v); err != nil {
-				return err
-			}
-		}
-		as, _, err := tx.Get(ctx, &pbv1.Assertions{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
-		if err != nil {
-			return err
-		}
-		for _, v := range as {
-			if err := tx.Delete(ctx, v); err != nil {
-				return err
-			}
-		}
-		return tx.Delete(ctx, &openfgav1.Store{Id: id})
-	})
+	}
+	return t.tx.Delete(ctx, &openfgav1.Store{Id: id})
 }
 
-func (p *pdb) GetStore(ctx context.Context, id string) (*openfgav1.Store, error) {
-	ss, _, err := typed.NewStore[openfgav1.Store](p.db).Get(ctx, &openfgav1.Store{Id: id})
+func (t *tx) GetStore(ctx context.Context, id string) (*openfgav1.Store, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ss, _, err := typed.NewTx[openfgav1.Store](t.tx).Get(ctx, &openfgav1.Store{Id: id})
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +501,9 @@ func (p *pdb) GetStore(ctx context.Context, id string) (*openfgav1.Store, error)
 	return ss[0], nil
 }
 
-func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([]*openfgav1.Store, string, error) {
+func (t *tx) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([]*openfgav1.Store, string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
 		return nil, "", err
@@ -346,7 +519,7 @@ func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([
 			f = protodb.Where("id").StringIN(opts.IDs...)
 		}
 	}
-	ss, info, err := typed.NewStore[openfgav1.Store](p.db).Get(ctx, &openfgav1.Store{}, protodb.WithFilter(f), protodb.WithPaging(&protodb.Paging{
+	ss, info, err := typed.NewTx[openfgav1.Store](t.tx).Get(ctx, &openfgav1.Store{}, protodb.WithFilter(f), protodb.WithPaging(&protodb.Paging{
 		Offset: tk.Offset,
 		Limit:  uint64(opts.Pagination.PageSize),
 		Token:  tk.Continuation,
@@ -360,13 +533,15 @@ func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([
 	return ss, newToken(info.Token, tk.Offset+uint64(len(ss))).String(), nil
 }
 
-func (p *pdb) WriteAssertions(ctx context.Context, store, modelID string, assertions []*openfgav1.Assertion) error {
-	_, err := p.db.Set(ctx, (&pbv1.Assertions{StoreId: store, ModelId: modelID, Assertions: assertions}).SetKey())
+func (t *tx) WriteAssertions(ctx context.Context, store, modelID string, assertions []*openfgav1.Assertion) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, err := t.tx.Set(ctx, (&pbv1.Assertions{StoreId: store, ModelId: modelID, Assertions: assertions}).SetKey())
 	return err
 }
 
-func (p *pdb) ReadAssertions(ctx context.Context, store, modelID string) ([]*openfgav1.Assertion, error) {
-	as, _, err := typed.NewStore[pbv1.Assertions](p.db).Get(ctx, &pbv1.Assertions{Key: pbv1.AssertionsKey(store, modelID)})
+func (t *tx) ReadAssertions(ctx context.Context, store, modelID string) ([]*openfgav1.Assertion, error) {
+	as, _, err := typed.NewTx[pbv1.Assertions](t.tx).Get(ctx, &pbv1.Assertions{Key: pbv1.AssertionsKey(store, modelID)})
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +551,9 @@ func (p *pdb) ReadAssertions(ctx context.Context, store, modelID string) ([]*ope
 	return as[0].Assertions, nil
 }
 
-func (p *pdb) ReadChanges(ctx context.Context, store string, filter storage.ReadChangesFilter, opts storage.ReadChangesOptions) ([]*openfgav1.TupleChange, string, error) {
+func (t *tx) ReadChanges(ctx context.Context, store string, filter storage.ReadChangesFilter, opts storage.ReadChangesOptions) ([]*openfgav1.TupleChange, string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	f := protodb.Where("key").StringHasPrefix(store + "/")
 	// we do not set the horizontal offset in the filter because it may change
 	if filter.ObjectType != "" {
@@ -399,7 +576,7 @@ func (p *pdb) ReadChanges(ctx context.Context, store string, filter storage.Read
 	if opts.SortDesc {
 		o = append(o, protodb.WithReverse())
 	}
-	cs, _, err := typed.NewStore[pbv1.Change](p.db).Get(ctx, &pbv1.Change{}, o...)
+	cs, _, err := typed.NewTx[pbv1.Change](t.tx).Get(ctx, &pbv1.Change{}, o...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -423,14 +600,16 @@ func (p *pdb) ReadChanges(ctx context.Context, store string, filter storage.Read
 	return out, cont, nil
 }
 
-func (p *pdb) IsReady(ctx context.Context) (storage.ReadinessStatus, error) {
-	return storage.ReadinessStatus{IsReady: true}, nil
+func (t *tx) Commit(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.tx.Commit(ctx)
 }
 
-func (p *pdb) Close() {
-	if !p.external {
-		p.db.Close()
-	}
+func (t *tx) Close() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.tx.Close()
 }
 
 func newToken(continuation string, offset uint64) *token {
