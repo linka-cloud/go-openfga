@@ -1,17 +1,16 @@
-package openfga_test
+package x_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/openfga/openfga/pkg/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	protodb2 "go.linka.cloud/protodb"
 
-	"go.linka.cloud/go-openfga"
 	"go.linka.cloud/go-openfga/storage/protodb"
 	"go.linka.cloud/go-openfga/tests"
+	"go.linka.cloud/go-openfga/x"
 )
 
 func TestServer(t *testing.T) {
@@ -21,19 +20,18 @@ func TestServer(t *testing.T) {
 	db, err := protodb.New(ctx, protodb2.WithInMemory(true))
 	require.NoError(t, err)
 	defer db.Close()
-	f, err := openfga.New(server.WithDatastore(db))
+	f, err := x.New(db)
 	require.NoError(t, err)
-	defer f.Close()
 
-	_, err = f.GetStore(ctx, "default")
-	require.Error(t, err)
+	tx, err := f.Tx(ctx)
+	require.NoError(t, err)
+	defer tx.Close()
 
-	s, err := f.CreateStore(ctx, "default")
+	s, err := tx.CreateStore(ctx, "default")
 	require.NoError(t, err)
 	require.NotEmpty(t, s.ID())
 	assert.Equal(t, "default", s.Name())
-	_, err = s.AuthorizationModel(ctx, "")
-	require.Error(t, err)
+
 	m, err := s.WriteAuthorizationModel(ctx, tests.DSL)
 	require.NoError(t, err)
 	require.NotEmpty(t, m.ID())
@@ -73,4 +71,12 @@ func TestServer(t *testing.T) {
 	us, err = m.ListUsers(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.CanRead, tests.User.Type(), tests.ExpiringGrant.Current, "2024-01-01T00:00:00Z")
 	require.NoError(t, err)
 	assert.Len(t, us, 1)
+
+	tx.Close()
+	tx, err = f.Tx(ctx)
+	require.NoError(t, err)
+	defer tx.Close()
+	s, err = tx.GetStore(ctx, s.ID())
+	require.Error(t, err)
+	require.Nil(t, s)
 }
