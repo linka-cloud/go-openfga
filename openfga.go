@@ -49,6 +49,7 @@ type Model interface {
 	Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error)
 	ListObjects(ctx context.Context, typ, relation, user string) ([]string, error)
 	ListUsers(ctx context.Context, object, relation, userTyp string, contextKVs ...any) ([]string, error)
+	ListRelations(ctx context.Context, object, user string, relations ...string) ([]string, error)
 	Tx() Tx
 	Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error)
 	CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs ...any) (bool, error)
