@@ -144,3 +144,5 @@ require (
 	k8s.io/klog/v2 v2.120.1 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )
+
+replace github.com/openfga/openfga => github.com/linka-cloud/openfga v1.8.1-0.20250218121319-3698667f79bb
