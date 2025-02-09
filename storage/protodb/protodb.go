@@ -217,6 +217,9 @@ func (p *pdb) ReadAuthorizationModel(ctx context.Context, store string, id strin
 		if len(ms) == 0 {
 			return nil, storage.ErrNotFound
 		}
+		if len(ms[0].Model.TypeDefinitions) == 0 {
+			return nil, storage.ErrNotFound
+		}
 		return ms[0].Model, nil
 	})
 }
@@ -270,6 +273,8 @@ func (p *pdb) CreateStore(ctx context.Context, store *openfgav1.Store) (*openfga
 		if len(ss) != 0 {
 			return nil, storage.ErrCollision
 		}
+		store.CreatedAt = timestamppb.Now()
+		store.UpdatedAt = store.CreatedAt
 		return typed.NewStore[openfgav1.Store](p.db).Set(ctx, store)
 	})
 }
@@ -281,7 +286,7 @@ func (p *pdb) DeleteStore(ctx context.Context, id string) error {
 			return err
 		}
 		if len(ss) == 0 {
-			return storage.ErrNotFound
+			return nil
 		}
 		ts, _, err := tx.Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(id))))
 		if err != nil {
@@ -330,7 +335,18 @@ func (p *pdb) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([
 	if err != nil {
 		return nil, "", err
 	}
-	ss, info, err := typed.NewStore[openfgav1.Store](p.db).Get(ctx, &openfgav1.Store{}, protodb.WithPaging(&protodb.Paging{
+	var f filters.Builder
+	if opts.Name != "" {
+		f = protodb.Where("name").StringEquals(opts.Name)
+	}
+	if len(opts.IDs) != 0 {
+		if f != nil {
+			f.And("id").StringIN(opts.IDs...)
+		} else {
+			f = protodb.Where("id").StringIN(opts.IDs...)
+		}
+	}
+	ss, info, err := typed.NewStore[openfgav1.Store](p.db).Get(ctx, &openfgav1.Store{}, protodb.WithFilter(f), protodb.WithPaging(&protodb.Paging{
 		Offset: tk.Offset,
 		Limit:  uint64(opts.Pagination.PageSize),
 		Token:  tk.Continuation,
