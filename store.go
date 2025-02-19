@@ -21,7 +21,6 @@ import (
 	"time"
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
-	parser "github.com/openfga/language/pkg/go/transformer"
 )
 
 type store struct {
@@ -79,8 +78,8 @@ func (s *store) LastAuthorizationModel(ctx context.Context) (Model, error) {
 	return &model{m: res.AuthorizationModels[len(res.AuthorizationModels)-1], s: s}, nil
 }
 
-func (s *store) WriteAuthorizationModel(ctx context.Context, dsl string) (Model, error) {
-	m, err := parser.TransformDSLToProto(dsl)
+func (s *store) WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model, error) {
+	m, err := combineModules(dsl...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse model: %w", err)
 	}

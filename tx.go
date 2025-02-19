@@ -81,6 +81,8 @@ func (t *tx) DeleteTuples(deletes ...*openfgav1.TupleKey) error {
 func (t *tx) Commit(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.m.mu.RLock()
+	defer t.m.mu.RUnlock()
 	if t.done {
 		return errors.New("transaction closed")
 	}
