@@ -32,7 +32,7 @@ type Store interface {
 	AuthorizationModel(ctx context.Context, id string) (Model, error)
 	LastAuthorizationModel(ctx context.Context) (Model, error)
 	ListAuthorizationModels(ctx context.Context) ([]Model, error)
-	WriteAuthorizationModel(ctx context.Context, dsl string) (Model, error)
+	WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model, error)
 
 	ID() string
 	Name() string
@@ -58,6 +58,8 @@ type Model interface {
 	WriteTuples(context.Context, ...*openfgav1.TupleKey) error
 	Delete(ctx context.Context, object, relation, user string) error
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
+
+	Reload(ctx context.Context) error
 }
 
 type Tx interface {

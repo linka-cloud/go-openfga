@@ -17,6 +17,7 @@ package example
 
 import (
 	"context"
+	_ "embed"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,6 +29,9 @@ var (
 	_ = codes.OK
 	_ = status.New
 )
+
+//go:embed resource.fga
+var ResourceServiceModel string
 
 var ResourceServiceRoles = struct {
 	System struct {

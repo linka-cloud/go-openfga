@@ -19,17 +19,22 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	parser "github.com/openfga/language/pkg/go/transformer"
 	"github.com/openfga/openfga/pkg/tuple"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+const SchemaVersion = "1.2"
+
 type model struct {
-	m *openfgav1.AuthorizationModel
-	s *store
+	m  *openfgav1.AuthorizationModel
+	s  *store
+	mu sync.RWMutex
 }
 
 func (m *model) Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error) {
@@ -37,6 +42,8 @@ func (m *model) Check(ctx context.Context, object, relation, user string, contex
 }
 
 func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs ...any) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	c, err := makeContext(contextKVs...)
 	if err != nil {
 		return false, err
@@ -55,6 +62,8 @@ func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey, context
 }
 
 func (m *model) Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	res, err := m.s.c.c.Read(ctx, &openfgav1.ReadRequest{
 		StoreId:  m.s.id,
 		TupleKey: &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
@@ -63,6 +72,8 @@ func (m *model) Read(ctx context.Context, object, relation, user string) ([]*ope
 }
 
 func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	res, err := m.s.c.c.Expand(ctx, &openfgav1.ExpandRequest{
 		StoreId:              m.s.id,
 		TupleKey:             &openfgav1.ExpandRequestTupleKey{Relation: relation, Object: object},
@@ -72,6 +83,8 @@ func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1
 }
 
 func (m *model) ListObjects(ctx context.Context, typ, relation, user string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	res, err := m.s.c.c.ListObjects(ctx, &openfgav1.ListObjectsRequest{
 		StoreId:              m.s.id,
 		AuthorizationModelId: m.m.Id,
@@ -83,6 +96,8 @@ func (m *model) ListObjects(ctx context.Context, typ, relation, user string) ([]
 }
 
 func (m *model) ListUsers(ctx context.Context, object, relation, userTyp string, contextKVs ...any) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	c, err := makeContext(contextKVs...)
 	if err != nil {
 		return nil, err
@@ -110,6 +125,8 @@ func (m *model) ListUsers(ctx context.Context, object, relation, userTyp string,
 }
 
 func (m *model) ListRelations(ctx context.Context, object, user string, relations ...string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if len(relations) == 0 {
 		objectType := strings.Split(object, ":")[0]
 		for _, v := range m.m.TypeDefinitions {
@@ -181,6 +198,8 @@ func (m *model) WriteTuples(ctx context.Context, keys ...*openfgav1.TupleKey) er
 }
 
 func (m *model) WriteWithCondition(ctx context.Context, object, relation, user string, condition string, kv ...any) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	tx := m.Tx()
 	defer tx.Close()
 	if err := tx.WriteWithCondition(object, relation, user, condition, kv...); err != nil {
@@ -190,12 +209,28 @@ func (m *model) WriteWithCondition(ctx context.Context, object, relation, user s
 }
 
 func (m *model) DeleteTuples(ctx context.Context, keys ...*openfgav1.TupleKey) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	tx := m.Tx()
 	defer tx.Close()
 	if err := tx.DeleteTuples(keys...); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func (m *model) Reload(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	res, err := m.s.c.c.ReadAuthorizationModels(ctx, &openfgav1.ReadAuthorizationModelsRequest{StoreId: m.s.id})
+	if err != nil {
+		return err
+	}
+	if len(res.AuthorizationModels) == 0 {
+		return errors.New("not found")
+	}
+	m.m = res.AuthorizationModels[len(res.AuthorizationModels)-1]
+	return nil
 }
 
 func (m *model) Tx() Tx {
@@ -224,4 +259,36 @@ func makeContext(kv ...any) (*structpb.Struct, error) {
 		m[k] = kv[i+1]
 	}
 	return structpb.NewStruct(m)
+}
+
+func CombineModules(dsl ...string) (string, error) {
+	mod, err := combineModules(dsl...)
+	if err != nil {
+		return "", err
+	}
+	// parser.TransformJSONProtoToDSL fails due to a bug in the parser on the nil `this`
+	b, err := protojson.Marshal(mod)
+	if err != nil {
+		return "", err
+	}
+	mod.Reset()
+	if err := protojson.Unmarshal(b, mod); err != nil {
+		return "", err
+	}
+	out, err := parser.TransformJSONProtoToDSL(mod, parser.WithIncludeSourceInformation(true))
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+func combineModules(dsl ...string) (*openfgav1.AuthorizationModel, error) {
+	if len(dsl) == 1 {
+		return parser.TransformDSLToProto(dsl[0])
+	}
+	var mods []parser.ModuleFile
+	for _, v := range dsl {
+		mods = append(mods, parser.ModuleFile{Contents: v})
+	}
+	return parser.TransformModuleFilesToModel(mods, SchemaVersion)
 }

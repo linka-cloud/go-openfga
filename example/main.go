@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate sh -c "fga model transform --file fga.mod --output-format fga > model.fga"
-
 package main
 
 import (
@@ -35,8 +33,8 @@ import (
 	"go.linka.cloud/go-openfga/interceptors"
 )
 
-//go:embed model.fga
-var model string
+//go:embed base.fga
+var modelBase string
 
 const userKey = "user"
 
@@ -54,14 +52,17 @@ func main() {
 		log.Fatal(err)
 	}
 	defer f.Close()
+
 	s, err := f.CreateStore(ctx, "default")
 	if err != nil {
 		log.Fatal(err)
 	}
-	model, err := s.WriteAuthorizationModel(ctx, model)
+
+	model, err := s.WriteAuthorizationModel(ctx, modelBase, example.ResourceServiceModel)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fga, err := interceptors.New(ctx, model, interceptors.WithUserFunc(func(ctx context.Context) (string, map[string]any, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok || len(md.Get(userKey)) == 0 {
@@ -72,6 +73,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// register some users with system roles
 	for _, v := range []string{
 		example.ResourceServiceRoles.System.ResourceReader,
 		example.ResourceServiceRoles.System.ResourceWriter,

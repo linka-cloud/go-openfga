@@ -8,6 +8,7 @@ package {{ package . }}
 
 import (
   "context"
+	_ "embed"
 
   "google.golang.org/grpc/codes"
   "google.golang.org/grpc/status"
@@ -23,6 +24,9 @@ var (
 {{ range .Services }}
 {{ $service := . }}
 {{ with (module .) }}
+//go:embed {{ file $service ".fga" }}
+var {{ $service.Name }}Model string
+
 var {{ $service.Name }}Roles = struct {
  	{{- range .Extends }}
  	{{- $name := .Name }}

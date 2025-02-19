@@ -54,6 +54,9 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 	m.tpl = template.Must(template.New("register").Funcs(map[string]any{
 		"package": m.ctx.PackageName,
 		"name":    m.ctx.Name,
+		"file": func(s pgs.Service, ext string) string {
+			return s.File().InputPath().BaseName() + ext
+		},
 		"comment": func(s string) string {
 			var out string
 			parts := strings.Split(s, "\n")
