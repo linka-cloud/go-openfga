@@ -1,0 +1,31 @@
+#!/usr/bin/env -S buf generate --template
+---
+version: v2
+managed:
+  enabled: true
+  override:
+  - file_option: go_package_prefix
+    module: "buf.build/openfga/api"
+    value: github.com/openfga/api/proto
+plugins:
+- local: protoc-gen-go-patch
+  out: .
+  opt:
+  - plugin=go
+  - paths=source_relative
+- local: protoc-gen-go-patch
+  out: .
+  opt:
+  - plugin=go-grpc
+  - paths=source_relative
+- local: protoc-gen-go-patch
+  out: .
+  opt:
+  - plugin=validate
+  - paths=source_relative
+  - lang=go
+- local: protoc-gen-go-patch
+  out: .
+  opt:
+  - plugin=go-openfga
+  - paths=source_relative

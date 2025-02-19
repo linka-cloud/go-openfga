@@ -1,0 +1,10 @@
+module base
+
+type system
+  relations
+    define admin: [user]
+    define writer: [user]
+    define reader: [user]
+    define watcher: [user]
+
+type user

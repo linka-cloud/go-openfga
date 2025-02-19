@@ -1,0 +1,125 @@
+// Copyright 2025 Linka Cloud  All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package example;
+
+option go_package = "./example";
+
+import "openfga/v1alpha1/openfga.proto";
+import "patch/go.proto";
+
+option (go.lint).all = true;
+
+service ResourceService {
+  option (fga.v1alpha1.module) = {
+    name: "resource",
+    extends: [ {
+      name: "system",
+      relations: [
+        { name: "resource_admin", relation: "[user, user with non_expired_grant] or admin" },
+        { name: "resource_writer", relation: "[user] or resource_admin" },
+        { name: "resource_reader", relation: "[user] or resource_admin or reader" },
+        { name: "resource_watcher", relation: "[user] or resource_admin or watcher" },
+        { name: "can_create_resource", relation: "resource_writer" },
+        { name: "can_list_resources", relation: "resource_reader" },
+        { name: "can_watch_resources", relation: "resource_watcher" }
+      ]
+    } ],
+    types: [ {
+      name: "resource",
+      relations: [
+        { name: "system", relation: "[system]" },
+        { name: "admin", relation: "[user] or resource_admin from system" },
+        { name: "reader", relation: "[user] or resource_reader from system" },
+        { name: "can_read", relation: "reader" },
+        { name: "can_update", relation: "admin" },
+        { name: "can_delete", relation: "admin" }
+      ]
+    } ],
+    conditions: [ "non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) { current_time < grant_time + grant_duration }" ]
+  };
+  rpc Create (CreateRequest) returns (CreateResponse) {
+    option (fga.v1alpha1.access) = { type: "system", relation: "can_create_resource", id: "default" };
+  };
+  rpc Read (ReadRequest) returns (ReadResponse) {
+    option (fga.v1alpha1.access) = { type: "resource", relation: "can_read", id: "{id}" };
+  }
+  rpc Update (UpdateRequest) returns (UpdateResponse) {
+    option (fga.v1alpha1.access) = { type: "resource", relation: "can_create", id: "{resource.id}" };
+  }
+  rpc Delete(DeleteRequest) returns (DeleteResponse) {
+    option (fga.v1alpha1.access) = { type: "resource", relation: "can_create", id: "{id}" };
+  }
+  rpc List(ListRequest) returns (ListResponse) {
+    option (fga.v1alpha1.access) = { type: "system", relation: "can_list_resources", id: "default" };
+  }
+  rpc Watch(WatchRequest) returns (stream Event) {
+    option (fga.v1alpha1.access) = { type: "system", relation: "can_watch_resources", id: "default" };
+  }
+}
+
+message CreateRequest {
+  Resource resource = 1;
+}
+
+message CreateResponse {
+  Resource resource = 1;
+}
+
+message ReadRequest {
+  string id = 1;
+}
+
+message ReadResponse {
+  Resource resource = 1;
+}
+
+message UpdateRequest {
+  Resource resource = 1;
+}
+
+message UpdateResponse {
+  Resource resource = 1;
+}
+
+message DeleteRequest {
+  string id = 1;
+}
+
+message DeleteResponse {}
+
+message ListRequest {}
+
+message ListResponse {
+  repeated Resource resources = 1;
+}
+
+message WatchRequest {}
+
+message Event {
+  enum Type {
+    NONE = 0;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
+  }
+  Type type = 1;
+  Resource resource = 2;
+}
+
+message Resource {
+  string id = 1;
+}

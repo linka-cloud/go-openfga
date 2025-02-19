@@ -3,6 +3,7 @@ deps:
 - buf.build/envoyproxy/protoc-gen-validate
 - buf.build/googleapis/googleapis
 - buf.build/openfga/api
+- buf.build/linka-cloud/protopatch
 breaking:
   use:
   - FILE
