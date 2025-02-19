@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package fga.v1alpha1;
+
+option go_package = "go.linka.cloud/go-openfga/openfga/v1alpha1;openfgav1alpha1";
+
+import "google/protobuf/descriptor.proto";
+import "validate/validate.proto";
+import "patch/go.proto";
+
+option (go.lint).all = true;
+
+extend google.protobuf.ServiceOptions {
+  Module module = 14242;
+}
+
+extend google.protobuf.MethodOptions {
+  Access access = 14242;
+}
+
+message Module {
+  string name = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  repeated Type extends = 2;
+  repeated Type types = 3;
+  repeated string conditions = 4;
+}
+
+message Type {
+  string name = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  repeated Relation relations = 2;
+}
+
+message Relation {
+  string name = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  string relation = 2;
+}
+
+message Access {
+  string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  string relation = 2 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+  string id = 3 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+}
+
