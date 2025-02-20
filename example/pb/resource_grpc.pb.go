@@ -18,7 +18,7 @@
 // - protoc             (unknown)
 // source: example/pb/resource.proto
 
-package example
+package resource
 
 import (
 	context "context"
@@ -33,12 +33,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ResourceService_Create_FullMethodName = "/example.ResourceService/Create"
-	ResourceService_Read_FullMethodName   = "/example.ResourceService/Read"
-	ResourceService_Update_FullMethodName = "/example.ResourceService/Update"
-	ResourceService_Delete_FullMethodName = "/example.ResourceService/Delete"
-	ResourceService_List_FullMethodName   = "/example.ResourceService/List"
-	ResourceService_Watch_FullMethodName  = "/example.ResourceService/Watch"
+	ResourceService_Create_FullMethodName = "/resource.ResourceService/Create"
+	ResourceService_Read_FullMethodName   = "/resource.ResourceService/Read"
+	ResourceService_Update_FullMethodName = "/resource.ResourceService/Update"
+	ResourceService_Delete_FullMethodName = "/resource.ResourceService/Delete"
+	ResourceService_List_FullMethodName   = "/resource.ResourceService/List"
+	ResourceService_Watch_FullMethodName  = "/resource.ResourceService/Watch"
 )
 
 // ResourceServiceClient is the client API for ResourceService service.
@@ -294,7 +294,7 @@ type ResourceService_WatchServer = grpc.ServerStreamingServer[Event]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ResourceService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "example.ResourceService",
+	ServiceName: "resource.ResourceService",
 	HandlerType: (*ResourceServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

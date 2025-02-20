@@ -101,7 +101,7 @@ func (m *Module) validate(all bool) error {
 
 	}
 
-	for idx, item := range m.GetTypes() {
+	for idx, item := range m.GetDefinitions() {
 		_, _ = idx, item
 
 		if all {
@@ -109,7 +109,7 @@ func (m *Module) validate(all bool) error {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, ModuleValidationError{
-						field:  fmt.Sprintf("Types[%v]", idx),
+						field:  fmt.Sprintf("Definitions[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -117,7 +117,7 @@ func (m *Module) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, ModuleValidationError{
-						field:  fmt.Sprintf("Types[%v]", idx),
+						field:  fmt.Sprintf("Definitions[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -126,7 +126,7 @@ func (m *Module) validate(all bool) error {
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return ModuleValidationError{
-					field:  fmt.Sprintf("Types[%v]", idx),
+					field:  fmt.Sprintf("Definitions[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -235,9 +235,9 @@ func (m *Type) validate(all bool) error {
 
 	var errors []error
 
-	if !_Type_Name_Pattern.MatchString(m.GetName()) {
+	if !_Type_Type_Pattern.MatchString(m.GetType()) {
 		err := TypeValidationError{
-			field:  "Name",
+			field:  "Type",
 			reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
 		}
 		if !all {
@@ -357,7 +357,7 @@ var _ interface {
 	ErrorName() string
 } = TypeValidationError{}
 
-var _Type_Name_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
+var _Type_Type_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
 
 // Validate checks the field values on Relation with the rules defined in the
 // proto definition for this message. If any rules are violated, the first

@@ -29,23 +29,47 @@ import (
 	"google.golang.org/grpc/status"
 
 	"go.linka.cloud/go-openfga"
-	example "go.linka.cloud/go-openfga/example/pb"
+	pb "go.linka.cloud/go-openfga/example/pb"
 	"go.linka.cloud/go-openfga/interceptors"
 )
 
 //go:embed base.fga
 var modelBase string
 
+// userKey is the key used to store the user in the context metadata
 const userKey = "user"
 
+// defaultSystem is the default system object
+var defaultSystem = pb.FGASystemObject("default")
+
+// userContext returns a new context with the user set in the metadata
 func userContext(ctx context.Context, user string) context.Context {
 	return metadata.NewOutgoingContext(ctx, metadata.Pairs(userKey, user))
+}
+
+// contextUser returns the user from the context metadata
+func contextUser(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok || len(md.Get(userKey)) == 0 {
+		return "", status.Errorf(codes.Unauthenticated, "missing user from metadata")
+	}
+	return "user:" + md.Get(userKey)[0], nil
+}
+
+// mustContextUser returns the user from the context metadata or panics
+func mustContextUser(ctx context.Context) string {
+	user, err := contextUser(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return user
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// create the in-memory openfga server
 	mem := memory.New()
 	f, err := openfga.New(server.WithDatastore(mem))
 	if err != nil {
@@ -53,22 +77,25 @@ func main() {
 	}
 	defer f.Close()
 
+	// create the store
 	s, err := f.CreateStore(ctx, "default")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	model, err := s.WriteAuthorizationModel(ctx, modelBase, example.ResourceServiceModel)
+	// write the model
+	model, err := s.WriteAuthorizationModel(ctx, modelBase, pb.FGAModel)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// create the interceptors
 	fga, err := interceptors.New(ctx, model, interceptors.WithUserFunc(func(ctx context.Context) (string, map[string]any, error) {
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok || len(md.Get(userKey)) == 0 {
-			return "", nil, status.Errorf(codes.Unauthenticated, "missing user from metadata")
+		user, err := contextUser(ctx)
+		if err != nil {
+			return "", nil, err
 		}
-		return "user:" + md.Get(userKey)[0], nil, nil
+		return user, nil, nil
 	}))
 	if err != nil {
 		log.Fatal(err)
@@ -76,12 +103,12 @@ func main() {
 
 	// register some users with system roles
 	for _, v := range []string{
-		example.ResourceServiceRoles.System.ResourceReader,
-		example.ResourceServiceRoles.System.ResourceWriter,
-		example.ResourceServiceRoles.System.ResourceAdmin,
-		example.ResourceServiceRoles.System.ResourceWatcher,
+		pb.FGASystemResourceReader,
+		pb.FGASystemResourceWriter,
+		pb.FGASystemResourceAdmin,
+		pb.FGASystemResourceWatcher,
 	} {
-		if err := model.Write(ctx, "system:default", v, fmt.Sprintf("user:%s", v)); err != nil {
+		if err := model.Write(ctx, defaultSystem, v, fmt.Sprintf("user:%s", v)); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -90,7 +117,7 @@ func main() {
 	svc := NewResourceService()
 
 	// register the service permissions
-	example.RegisterResourceServiceFGA(fga)
+	pb.RegisterFGA(fga)
 
 	// create the in-process grpc channel
 	channel := (&inprocgrpc.Channel{}).
@@ -98,25 +125,27 @@ func main() {
 		WithServerStreamInterceptor(fga.StreamServerInterceptor())
 
 	// register the service as usual
-	example.RegisterResourceServiceServer(channel, svc)
+	pb.RegisterResourceServiceServer(channel, svc)
 
 	// create a client
-	client := example.NewResourceServiceClient(channel)
+	client := pb.NewResourceServiceClient(channel)
 
 	// validate checks
-	if _, err := client.List(userContext(ctx, example.ResourceServiceRoles.System.ResourceReader), &example.ListRequest{}); err != nil {
+	if _, err := client.List(userContext(ctx, pb.FGASystemResourceReader), &pb.ListRequest{}); err != nil {
 		log.Fatal(err)
 	}
 
-	if _, err := client.Create(userContext(ctx, example.ResourceServiceRoles.System.ResourceReader), &example.CreateRequest{Resource: &example.Resource{ID: "0"}}); err == nil {
+	if _, err := client.Create(userContext(ctx, pb.FGASystemResourceReader), &pb.CreateRequest{Resource: &pb.Resource{ID: "0"}}); err == nil {
 		log.Fatal("reader should not be able to create")
 	}
 
-	if _, err := client.Create(userContext(ctx, example.ResourceServiceRoles.System.ResourceWriter), &example.CreateRequest{Resource: &example.Resource{ID: "0"}}); err != nil {
+	if _, err := client.Create(userContext(ctx, pb.FGASystemResourceWriter), &pb.CreateRequest{Resource: &pb.Resource{ID: "0"}}); err != nil {
 		log.Fatal(err)
 	}
 
-	ss, err := client.Watch(userContext(ctx, example.ResourceServiceRoles.System.ResourceWriter), &example.WatchRequest{})
+	wctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	ss, err := client.Watch(userContext(wctx, pb.FGASystemResourceWriter), &pb.WatchRequest{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -125,7 +154,9 @@ func main() {
 		log.Fatal("writer should not be able to watch")
 	}
 
-	ss, err = client.Watch(userContext(ctx, example.ResourceServiceRoles.System.ResourceAdmin), &example.WatchRequest{})
+	wctx, cancel = context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	ss, err = client.Watch(userContext(wctx, pb.FGASystemResourceAdmin), &pb.WatchRequest{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,7 +164,7 @@ func main() {
 	// create a resource to trigger an event
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		if _, err := client.Create(userContext(ctx, example.ResourceServiceRoles.System.ResourceWriter), &example.CreateRequest{Resource: &example.Resource{ID: "1"}}); err != nil {
+		if _, err := client.Create(userContext(ctx, pb.FGASystemResourceWriter), &pb.CreateRequest{Resource: &pb.Resource{ID: "1"}}); err != nil {
 			log.Fatal(err)
 		}
 	}()

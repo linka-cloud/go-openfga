@@ -21,12 +21,12 @@ extend google.protobuf.MethodOptions {
 message Module {
   string name = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
   repeated Type extends = 2;
-  repeated Type types = 3;
+  repeated Type definitions = 3;
   repeated string conditions = 4;
 }
 
 message Type {
-  string name = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
   repeated Relation relations = 2;
 }
 

@@ -25,62 +25,48 @@ var (
 {{ $service := . }}
 {{ with (module .) }}
 //go:embed {{ file $service ".fga" }}
-var {{ $service.Name }}Model string
+var FGAModel string
 
-var {{ $service.Name }}Roles = struct {
- 	{{- range .Extends }}
- 	{{- $name := .Name }}
-	{{- with .Relations }}
-	{{ upperCamelCase $name }} struct {
- 		{{- range . }}
-		{{ upperCamelCase .Define }} string
-		{{- end }}
-	}
-	{{- end }}
- 	{{- end }}
-	{{- range .Types }}
-	{{- $name := .Name }}
-	{{- with .Relations }}
-	{{ upperCamelCase $name }} struct {
-		{{- range . }}
-		{{ upperCamelCase .Define }} string
-		{{- end }}
-	}
-	{{- end }}
-	{{- end }}
- }{
+const (
 	{{- range .Extends }}
-	{{- $name := .Name }}
+	{{- $name := .Type }}
 	{{- with .Relations }}
-	{{ upperCamelCase $name }}: struct {
-		{{- range . }}
-	 	{{ upperCamelCase .Define }} string
-		{{- end }}
-	 }{
+	FGA{{ upperCamelCase $name }}Type = "{{ $name }}"
 	{{- range . }}
-	 	{{ upperCamelCase .Define }}: "{{ .Define }}",
-	{{- end }}
-	},
+	FGA{{ upperCamelCase (printf "%s_%s" $name .Define) }} = "{{ .Define }}"
 	{{- end }}
 	{{- end }}
-	{{- range .Types }}
-	{{- $name := .Name }}
+	{{- end }}
+	{{- range .Definitions }}
+	{{- $name := .Type }}
 	{{- with .Relations }}
-	{{ upperCamelCase $name }}: struct {
-		{{- range . }}
-		 {{ upperCamelCase .Define }} string
-		{{- end }}
-	}{
+	FGA{{ upperCamelCase $name }}Type = "{{ $name }}"
 	{{- range . }}
-	 	{{ upperCamelCase .Define }}: "{{ .Define }}",
-	{{- end }}
-	},
+	FGA{{ upperCamelCase (printf "%s_%s" $name .Define) }} = "{{ .Define }}"
 	{{- end }}
 	{{- end }}
+	{{- end }}
+)
+
+{{- range .Extends }}
+{{- $name := .Type }}
+{{- with .Relations }}
+func FGA{{ upperCamelCase $name }}Object(id string) string {
+	return FGA{{ upperCamelCase $name }}Type + ":" + id
 }
+{{- end }}
+{{- end }}
+{{- range .Definitions }}
+{{- $name := .Type }}
+{{- with .Relations }}
+func FGA{{ upperCamelCase $name }}Object(id string) string {
+	return FGA{{ upperCamelCase $name }}Type + ":" + id
+}
+{{- end }}
+{{- end }}
 {{ end }}
 
-func Register{{ .Name }}FGA(fga fgainterceptors.FGA) {
+func RegisterFGA(fga fgainterceptors.FGA) {
 	{{- range .Methods }}
 	  {{- $method := . }}
 	  {{- with access . }}
@@ -94,9 +80,9 @@ func Register{{ .Name }}FGA(fga fgainterceptors.FGA) {
 			if id == "" {
 				return "", "", status.Error(codes.InvalidArgument, "{{ field . }} is required")
 			}
-			return "{{ .Type }}:" + id, "{{ .Check }}", nil
+			return FGA{{ upperCamelCase .Type }}Object(id), FGA{{ upperCamelCase (printf "%s_%s" .Type .Check) }}, nil
 			{{- else }}
-			return "{{ object . }}", "{{ .Check }}", nil
+			return FGA{{ upperCamelCase .Type }}Type + ":" + "{{ .ID }}", FGA{{ upperCamelCase (printf "%s_%s" .Type .Check) }}, nil
 			{{- end }}
     })
 	  {{- end }}

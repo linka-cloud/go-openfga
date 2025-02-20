@@ -14,9 +14,9 @@
 
 syntax = "proto3";
 
-package example;
+package resource;
 
-option go_package = "./example";
+option go_package = "./resource";
 
 import "openfga/openfga.proto";
 import "patch/go.proto";
@@ -27,7 +27,7 @@ service ResourceService {
   option (openfga.module) = {
     name: "resource",
     extends: [ {
-      name: "system",
+      type: "system",
       relations: [
         { define: "resource_admin", as: "[user, user with non_expired_grant] or admin" },
         { define: "resource_writer", as: "[user] or resource_admin" },
@@ -38,8 +38,8 @@ service ResourceService {
         { define: "can_watch_resources", as: "resource_watcher" }
       ]
     } ],
-    types: [ {
-      name: "resource",
+    definitions: [ {
+      type: "resource",
       relations: [
         { define: "system", as: "[system]" },
         { define: "admin", as: "[user] or resource_admin from system" },
