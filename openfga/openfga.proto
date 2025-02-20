@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package fga.v1alpha1;
+package openfga;
 
-option go_package = "go.linka.cloud/go-openfga/openfga/v1alpha1;openfgav1alpha1";
+option go_package = "go.linka.cloud/go-openfga/openfga;openfga";
 
 import "google/protobuf/descriptor.proto";
 import "validate/validate.proto";
@@ -31,13 +31,13 @@ message Type {
 }
 
 message Relation {
-  string name = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
-  string relation = 2;
+  string define = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  string as = 2;
 }
 
 message Access {
   string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
-  string relation = 2 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
-  string id = 3 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+  string id = 2 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+  string check = 3 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
 }
 

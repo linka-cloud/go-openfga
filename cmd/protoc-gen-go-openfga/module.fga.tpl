@@ -8,7 +8,7 @@ extend type {{ .Name }}
   {{- with .Relations }}
   relations
     {{- range . }}
-    define {{ .Name }}: {{ .Relation }}
+    define {{ .Define }}: {{ .As }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -20,7 +20,7 @@ type {{ .Name }}
   {{- with .Relations }}
   relations
     {{- range . }}
-    define {{ .Name }}: {{ .Relation }}
+    define {{ .Define }}: {{ .As }}
     {{- end }}
   {{- end }}
 {{- end }}

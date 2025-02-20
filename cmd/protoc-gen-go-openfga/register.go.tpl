@@ -33,7 +33,7 @@ var {{ $service.Name }}Roles = struct {
 	{{- with .Relations }}
 	{{ upperCamelCase $name }} struct {
  		{{- range . }}
-		{{ upperCamelCase .Name }} string
+		{{ upperCamelCase .Define }} string
 		{{- end }}
 	}
 	{{- end }}
@@ -43,7 +43,7 @@ var {{ $service.Name }}Roles = struct {
 	{{- with .Relations }}
 	{{ upperCamelCase $name }} struct {
 		{{- range . }}
-		{{ upperCamelCase .Name }} string
+		{{ upperCamelCase .Define }} string
 		{{- end }}
 	}
 	{{- end }}
@@ -54,11 +54,11 @@ var {{ $service.Name }}Roles = struct {
 	{{- with .Relations }}
 	{{ upperCamelCase $name }}: struct {
 		{{- range . }}
-	 	{{ upperCamelCase .Name }} string
+	 	{{ upperCamelCase .Define }} string
 		{{- end }}
 	 }{
 	{{- range . }}
-	 	{{ upperCamelCase .Name }}: "{{ .Name }}",
+	 	{{ upperCamelCase .Define }}: "{{ .Define }}",
 	{{- end }}
 	},
 	{{- end }}
@@ -68,11 +68,11 @@ var {{ $service.Name }}Roles = struct {
 	{{- with .Relations }}
 	{{ upperCamelCase $name }}: struct {
 		{{- range . }}
-		 {{ upperCamelCase .Name }} string
+		 {{ upperCamelCase .Define }} string
 		{{- end }}
 	}{
 	{{- range . }}
-	 	{{ upperCamelCase .Name }}: "{{ .Name }}",
+	 	{{ upperCamelCase .Define }}: "{{ .Define }}",
 	{{- end }}
 	},
 	{{- end }}
@@ -94,9 +94,9 @@ func Register{{ .Name }}FGA(fga fgainterceptors.FGA) {
 			if id == "" {
 				return "", "", status.Error(codes.InvalidArgument, "{{ field . }} is required")
 			}
-			return "{{ .Type }}:" + id, "{{ .Relation }}", nil
+			return "{{ .Type }}:" + id, "{{ .Check }}", nil
 			{{- else }}
-			return "{{ object . }}", "{{ .Relation }}", nil
+			return "{{ object . }}", "{{ .Check }}", nil
 			{{- end }}
     })
 	  {{- end }}
