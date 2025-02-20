@@ -4,7 +4,7 @@
 module {{ .Name }}
 {{ with .Extends }}
 {{- range . }}
-extend type {{ .Name }}
+extend type {{ .Type }}
   {{- with .Relations }}
   relations
     {{- range . }}
@@ -13,10 +13,10 @@ extend type {{ .Name }}
   {{- end }}
 {{- end }}
 {{- end }}
-{{ with .Types }}
+{{ with .Definitions }}
 
 {{- range . }}
-type {{ .Name }}
+type {{ .Type }}
   {{- with .Relations }}
   relations
     {{- range . }}
