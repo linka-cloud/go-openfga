@@ -18,56 +18,56 @@ package example;
 
 option go_package = "./example";
 
-import "openfga/v1alpha1/openfga.proto";
+import "openfga/openfga.proto";
 import "patch/go.proto";
 
 option (go.lint).all = true;
 
 service ResourceService {
-  option (fga.v1alpha1.module) = {
+  option (openfga.module) = {
     name: "resource",
     extends: [ {
       name: "system",
       relations: [
-        { name: "resource_admin", relation: "[user, user with non_expired_grant] or admin" },
-        { name: "resource_writer", relation: "[user] or resource_admin" },
-        { name: "resource_reader", relation: "[user] or resource_admin or reader" },
-        { name: "resource_watcher", relation: "[user] or resource_admin or watcher" },
-        { name: "can_create_resource", relation: "resource_writer" },
-        { name: "can_list_resources", relation: "resource_reader" },
-        { name: "can_watch_resources", relation: "resource_watcher" }
+        { define: "resource_admin", as: "[user, user with non_expired_grant] or admin" },
+        { define: "resource_writer", as: "[user] or resource_admin" },
+        { define: "resource_reader", as: "[user] or resource_admin or reader" },
+        { define: "resource_watcher", as: "[user] or resource_admin or watcher" },
+        { define: "can_create_resource", as: "resource_writer" },
+        { define: "can_list_resources", as: "resource_reader" },
+        { define: "can_watch_resources", as: "resource_watcher" }
       ]
     } ],
     types: [ {
       name: "resource",
       relations: [
-        { name: "system", relation: "[system]" },
-        { name: "admin", relation: "[user] or resource_admin from system" },
-        { name: "reader", relation: "[user] or resource_reader from system" },
-        { name: "can_read", relation: "reader" },
-        { name: "can_update", relation: "admin" },
-        { name: "can_delete", relation: "admin" }
+        { define: "system", as: "[system]" },
+        { define: "admin", as: "[user] or resource_admin from system" },
+        { define: "reader", as: "[user] or resource_reader from system" },
+        { define: "can_read", as: "reader" },
+        { define: "can_update", as: "admin" },
+        { define: "can_delete", as: "admin" }
       ]
     } ],
     conditions: [ "non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) { current_time < grant_time + grant_duration }" ]
   };
   rpc Create (CreateRequest) returns (CreateResponse) {
-    option (fga.v1alpha1.access) = { type: "system", relation: "can_create_resource", id: "default" };
+    option (openfga.access) = { type: "system", id: "default", check: "can_create_resource" };
   };
   rpc Read (ReadRequest) returns (ReadResponse) {
-    option (fga.v1alpha1.access) = { type: "resource", relation: "can_read", id: "{id}" };
+    option (openfga.access) = { type: "resource", id: "{id}", check: "can_read" };
   }
   rpc Update (UpdateRequest) returns (UpdateResponse) {
-    option (fga.v1alpha1.access) = { type: "resource", relation: "can_create", id: "{resource.id}" };
+    option (openfga.access) = { type: "resource", id: "{resource.id}", check: "can_update" };
   }
   rpc Delete(DeleteRequest) returns (DeleteResponse) {
-    option (fga.v1alpha1.access) = { type: "resource", relation: "can_create", id: "{id}" };
+    option (openfga.access) = { type: "resource", id: "{id}", check: "can_delete" };
   }
   rpc List(ListRequest) returns (ListResponse) {
-    option (fga.v1alpha1.access) = { type: "system", relation: "can_list_resources", id: "default" };
+    option (openfga.access) = { type: "system", id: "default", check: "can_list_resources" };
   }
   rpc Watch(WatchRequest) returns (stream Event) {
-    option (fga.v1alpha1.access) = { type: "system", relation: "can_watch_resources", id: "default" };
+    option (openfga.access) = { type: "system", id: "default", check: "can_watch_resources" };
   }
 }
 
@@ -99,15 +99,15 @@ message DeleteRequest {
   string id = 1;
 }
 
-message DeleteResponse {}
+message DeleteResponse { }
 
-message ListRequest {}
+message ListRequest { }
 
 message ListResponse {
   repeated Resource resources = 1;
 }
 
-message WatchRequest {}
+message WatchRequest { }
 
 message Event {
   enum Type {

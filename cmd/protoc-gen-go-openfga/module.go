@@ -23,7 +23,7 @@ import (
 	pgs "github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
 
-	openfgav1alpha1 "go.linka.cloud/go-openfga/openfga/v1alpha1"
+	"go.linka.cloud/go-openfga/openfga"
 )
 
 var _ pgs.Module = (*Module)(nil)
@@ -68,9 +68,9 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			}
 			return out
 		},
-		"module": func(s pgs.Service) *openfgav1alpha1.Module {
-			var mod openfgav1alpha1.Module
-			ok, err := s.Extension(openfgav1alpha1.ExtModule, &mod)
+		"module": func(s pgs.Service) *openfga.Module {
+			var mod openfga.Module
+			ok, err := s.Extension(openfga.ExtModule, &mod)
 			if err != nil {
 				m.Fail(err)
 			}
@@ -82,9 +82,9 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			}
 			return &mod
 		},
-		"access": func(me pgs.Method) *openfgav1alpha1.Access {
-			var access openfgav1alpha1.Access
-			ok, err := me.Extension(openfgav1alpha1.ExtAccess, &access)
+		"access": func(me pgs.Method) *openfga.Access {
+			var access openfga.Access
+			ok, err := me.Extension(openfga.ExtAccess, &access)
 			if err != nil {
 				m.Fail(err)
 			}
@@ -96,13 +96,13 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			}
 			return &access
 		},
-		"need_getter": func(a *openfgav1alpha1.Access) bool {
+		"need_getter": func(a *openfga.Access) bool {
 			return len(a.ID) >= 2 && a.ID[0] == '{' && a.ID[len(a.ID)-1] == '}'
 		},
-		"field": func(a *openfgav1alpha1.Access) string {
+		"field": func(a *openfga.Access) string {
 			return a.ID[1 : len(a.ID)-1]
 		},
-		"getter": func(a *openfgav1alpha1.Access, me pgs.Method) string {
+		"getter": func(a *openfga.Access, me pgs.Method) string {
 			t := me.Input()
 			parts := strings.Split(a.ID[1:len(a.ID)-1], ".")
 			var getter string
@@ -132,7 +132,7 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			}
 			return getter
 		},
-		"object": func(a *openfgav1alpha1.Access) string {
+		"object": func(a *openfga.Access) string {
 			return a.Type + ":" + a.ID
 		},
 		"upperCamelCase": func(s string) string {
@@ -167,8 +167,8 @@ func (m *Module) generate(f pgs.File) {
 }
 
 func (m *Module) generateModule(f pgs.File, s pgs.Service) error {
-	var mod openfgav1alpha1.Module
-	ok, err := s.Extension(openfgav1alpha1.ExtModule, &mod)
+	var mod openfga.Module
+	ok, err := s.Extension(openfga.ExtModule, &mod)
 	if err != nil {
 		return fmt.Errorf("unable to read module extension: %w", err)
 	}
@@ -189,8 +189,8 @@ func (m *Module) generateRegister(f pgs.File) error {
 		m.Push(v.Name().String())
 		for _, vv := range v.Methods() {
 			m.Push(vv.Name().String())
-			var a openfgav1alpha1.Access
-			if ok, _ := vv.Extension(openfgav1alpha1.ExtAccess, &a); !ok {
+			var a openfga.Access
+			if ok, _ := vv.Extension(openfga.ExtAccess, &a); !ok {
 				m.Pop()
 				continue
 			}

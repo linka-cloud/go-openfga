@@ -110,7 +110,7 @@ func RegisterResourceServiceFGA(fga fgainterceptors.FGA) {
 		if id == "" {
 			return "", "", status.Error(codes.InvalidArgument, "resource.id is required")
 		}
-		return "resource:" + id, "can_create", nil
+		return "resource:" + id, "can_update", nil
 	})
 	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
 		r, ok := req.(*DeleteRequest)
@@ -121,7 +121,7 @@ func RegisterResourceServiceFGA(fga fgainterceptors.FGA) {
 		if id == "" {
 			return "", "", status.Error(codes.InvalidArgument, "id is required")
 		}
-		return "resource:" + id, "can_create", nil
+		return "resource:" + id, "can_delete", nil
 	})
 	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
 		return "system:default", "can_list_resources", nil
