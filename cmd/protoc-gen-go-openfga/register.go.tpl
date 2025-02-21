@@ -22,50 +22,32 @@ var (
 )
 
 {{ range .Services }}
+
+{{ $types := (types .) }}
+const (
+{{- range $types }}
+	{{ $name := .Name }}
+	FGA{{ upperCamelCase .Name }}Type = "{{ $name }}"
+	{{ range $key, $value := .Relations }}
+	FGA{{ upperCamelCase (printf "%s_%s" $name $key) }} = "{{ $key }}"
+	{{- end }}
+{{- end }}
+)
+{{- range $types }}
+	{{ $name := .Name }}
+// FGA{{ upperCamelCase $name }}Object returns the object string for the {{ $name }} type, e.g. "{{ $name }}:id"
+func FGA{{ upperCamelCase $name }}Object(id string) string {
+	return FGA{{ upperCamelCase $name }}Type + ":" + id
+}
+{{- end }}
+
 {{ $service := . }}
 {{ with (module .) }}
 //go:embed {{ file $service ".fga" }}
 var FGAModel string
-
-const (
-	{{- range .Extends }}
-	{{- $name := .Type }}
-	{{- with .Relations }}
-	FGA{{ upperCamelCase $name }}Type = "{{ $name }}"
-	{{- range . }}
-	FGA{{ upperCamelCase (printf "%s_%s" $name .Define) }} = "{{ .Define }}"
-	{{- end }}
-	{{- end }}
-	{{- end }}
-	{{- range .Definitions }}
-	{{- $name := .Type }}
-	{{- with .Relations }}
-	FGA{{ upperCamelCase $name }}Type = "{{ $name }}"
-	{{- range . }}
-	FGA{{ upperCamelCase (printf "%s_%s" $name .Define) }} = "{{ .Define }}"
-	{{- end }}
-	{{- end }}
-	{{- end }}
-)
-
-{{- range .Extends }}
-{{- $name := .Type }}
-{{- with .Relations }}
-func FGA{{ upperCamelCase $name }}Object(id string) string {
-	return FGA{{ upperCamelCase $name }}Type + ":" + id
-}
-{{- end }}
-{{- end }}
-{{- range .Definitions }}
-{{- $name := .Type }}
-{{- with .Relations }}
-func FGA{{ upperCamelCase $name }}Object(id string) string {
-	return FGA{{ upperCamelCase $name }}Type + ":" + id
-}
-{{- end }}
-{{- end }}
 {{ end }}
 
+// RegisterFGA registers the {{ $service.Name }} service with the provided FGA interceptors.
 func RegisterFGA(fga fgainterceptors.FGA) {
 	{{- range .Methods }}
 	  {{- $method := . }}
