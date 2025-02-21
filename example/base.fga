@@ -3,8 +3,8 @@ module base
 type system
   relations
     define admin: [user]
-    define writer: [user]
-    define reader: [user]
-    define watcher: [user]
+    define writer: [user] or admin
+    define reader: [user] or admin
+    define watcher: [user] or admin
 
 type user

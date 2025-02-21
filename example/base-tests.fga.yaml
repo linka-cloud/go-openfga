@@ -1,0 +1,16 @@
+name: Base tests
+model_file: fga.mod
+tuples:
+- user: "user:admin"
+  relation: "admin"
+  object: "system:default"
+tests:
+- name: "admin can do anything on system:default"
+  check:
+  - user: "user:admin"
+    object: "system:default"
+    assertions:
+      admin: true
+      reader: true
+      watcher: true
+      writer: true
