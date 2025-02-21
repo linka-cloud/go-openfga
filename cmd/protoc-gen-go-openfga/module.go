@@ -68,34 +68,35 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			}
 			return out
 		},
-		"module": func(s pgs.Service) *openfga.Module {
-			var mod openfga.Module
-			ok, err := s.Extension(openfga.ExtModule, &mod)
-			if err != nil {
-				m.Fail(err)
+		"module": m.module,
+		"types": func(s pgs.Service) []Type {
+			t := make(map[string]Type)
+			mod := m.module(s)
+			if mod != nil {
+				for _, v := range append(mod.Extends, mod.Definitions...) {
+					t[v.Type] = Type{Name: v.Type, Relations: make(map[string]struct{})}
+					for _, vv := range v.Relations {
+						t[v.Type].Relations[vv.Define] = struct{}{}
+					}
+				}
 			}
-			if !ok {
-				return nil
+			for _, v := range s.Methods() {
+				if a := m.access(v); a != nil {
+					if _, ok := t[a.Type]; !ok {
+						t[a.Type] = Type{Name: a.Type, Relations: make(map[string]struct{})}
+					}
+					if _, ok := t[a.Type].Relations[a.Check]; !ok {
+						t[a.Type].Relations[a.Check] = struct{}{}
+					}
+				}
 			}
-			if err := mod.ValidateAll(); err != nil {
-				m.Fail(err)
+			var out []Type
+			for _, v := range t {
+				out = append(out, v)
 			}
-			return &mod
+			return out
 		},
-		"access": func(me pgs.Method) *openfga.Access {
-			var access openfga.Access
-			ok, err := me.Extension(openfga.ExtAccess, &access)
-			if err != nil {
-				m.Fail(err)
-			}
-			if !ok {
-				return nil
-			}
-			if err := access.ValidateAll(); err != nil {
-				m.Fail(err)
-			}
-			return &access
-		},
+		"access": m.access,
 		"need_getter": func(a *openfga.Access) bool {
 			return len(a.ID) >= 2 && a.ID[0] == '{' && a.ID[len(a.ID)-1] == '}'
 		},
@@ -150,6 +151,36 @@ func (m *Module) Execute(targets map[string]pgs.File, _ map[string]pgs.Package) 
 
 func (m *Module) Name() string {
 	return "go-fga"
+}
+
+func (m *Module) module(s pgs.Service) *openfga.Module {
+	var mod openfga.Module
+	ok, err := s.Extension(openfga.ExtModule, &mod)
+	if err != nil {
+		m.Fail(err)
+	}
+	if !ok {
+		return nil
+	}
+	if err := mod.ValidateAll(); err != nil {
+		m.Fail(err)
+	}
+	return &mod
+}
+
+func (m *Module) access(me pgs.Method) *openfga.Access {
+	var access openfga.Access
+	ok, err := me.Extension(openfga.ExtAccess, &access)
+	if err != nil {
+		m.Fail(err)
+	}
+	if !ok {
+		return nil
+	}
+	if err := access.ValidateAll(); err != nil {
+		m.Fail(err)
+	}
+	return &access
 }
 
 func (m *Module) generate(f pgs.File) {
@@ -208,4 +239,9 @@ func (m *Module) generateRegister(f pgs.File) error {
 	name := m.ctx.OutputPath(f).SetExt(".fga.go")
 	m.AddGeneratorTemplateFile(name.String(), m.tpl, f)
 	return nil
+}
+
+type Type struct {
+	Name      string
+	Relations map[string]struct{}
 }

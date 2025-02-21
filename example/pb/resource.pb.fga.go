@@ -30,34 +30,41 @@ var (
 	_ = status.New
 )
 
-//go:embed resource.fga
-var FGAModel string
-
 const (
-	FGASystemType              = "system"
-	FGASystemResourceAdmin     = "resource_admin"
-	FGASystemResourceWriter    = "resource_writer"
-	FGASystemResourceReader    = "resource_reader"
-	FGASystemResourceWatcher   = "resource_watcher"
+	FGASystemType = "system"
+
 	FGASystemCanCreateResource = "can_create_resource"
 	FGASystemCanListResources  = "can_list_resources"
 	FGASystemCanWatchResources = "can_watch_resources"
-	FGAResourceType            = "resource"
-	FGAResourceSystem          = "system"
-	FGAResourceAdmin           = "admin"
-	FGAResourceReader          = "reader"
-	FGAResourceCanRead         = "can_read"
-	FGAResourceCanUpdate       = "can_update"
-	FGAResourceCanDelete       = "can_delete"
+	FGASystemResourceAdmin     = "resource_admin"
+	FGASystemResourceReader    = "resource_reader"
+	FGASystemResourceWatcher   = "resource_watcher"
+	FGASystemResourceWriter    = "resource_writer"
+
+	FGAResourceType = "resource"
+
+	FGAResourceAdmin     = "admin"
+	FGAResourceCanDelete = "can_delete"
+	FGAResourceCanRead   = "can_read"
+	FGAResourceCanUpdate = "can_update"
+	FGAResourceReader    = "reader"
+	FGAResourceSystem    = "system"
 )
 
+// FGASystemObject returns the object string for the system type, e.g. "system:id"
 func FGASystemObject(id string) string {
 	return FGASystemType + ":" + id
 }
+
+// FGAResourceObject returns the object string for the resource type, e.g. "resource:id"
 func FGAResourceObject(id string) string {
 	return FGAResourceType + ":" + id
 }
 
+//go:embed resource.fga
+var FGAModel string
+
+// RegisterFGA registers the ResourceService service with the provided FGA interceptors.
 func RegisterFGA(fga fgainterceptors.FGA) {
 	fga.Register(ResourceService_Create_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
 		return FGASystemType + ":" + "default", FGASystemCanCreateResource, nil
