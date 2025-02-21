@@ -1,0 +1,48 @@
+name: Resource tests
+model_file: fga.mod
+tuples:
+- user: "system:default"
+  relation: "system"
+  object: "resource:0"
+- user: "user:admin"
+  relation: "admin"
+  object: "system:default"
+- user: "user:reader"
+  relation: "reader"
+  object: "system:default"
+tests:
+- name: "admin can do anything on system resources"
+  check:
+  - user: "user:admin"
+    object: "system:default"
+    assertions:
+      resource_admin: true
+      resource_reader: true
+      resource_writer: true
+      resource_watcher: true
+      can_create_resource: true
+      can_list_resources: true
+      can_watch_resources: true
+  - user: "user:admin"
+    object: "resource:0"
+    assertions:
+      admin: true
+      reader: true
+      can_read: true
+      can_update: true
+      can_delete: true
+- name: "system reader can read system resources"
+  check:
+  - user: "user:reader"
+    object: "system:default"
+    assertions:
+      resource_reader: true
+      can_list_resources: true
+  - user: "user:reader"
+    object: "resource:0"
+    assertions:
+      reader: true
+      can_read: true
+      can_update: false
+      can_delete: false
+
