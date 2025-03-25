@@ -18,6 +18,12 @@ type Option func(r *fga)
 
 func WithUserFunc(fn UserFunc) Option {
 	return func(f *fga) {
-		f.userFunc = fn
+		f.user = fn
+	}
+}
+
+func WithNormalizeFunc(fn func(string) string) Option {
+	return func(f *fga) {
+		f.normalize = fn
 	}
 }

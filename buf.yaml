@@ -16,3 +16,6 @@ modules:
   excludes:
   - example
   - storage
+- path: .
+  excludes:
+  - openfga
