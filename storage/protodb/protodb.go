@@ -244,7 +244,7 @@ func (p *pdb) ReadAuthorizationModels(ctx context.Context, store string, opts st
 }
 
 func (p *pdb) FindLatestAuthorizationModel(ctx context.Context, store string) (*openfgav1.AuthorizationModel, error) {
-	ms, _, err := typed.NewStore[pbv1.Model](p.db).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithReverse())
+	ms, _, err := typed.NewStore[pbv1.Model](p.db).Get(ctx, &pbv1.Model{}, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.ModelPrefix(store))), protodb.WithReverse(), protodb.WithOne())
 	if err != nil {
 		return nil, err
 	}
