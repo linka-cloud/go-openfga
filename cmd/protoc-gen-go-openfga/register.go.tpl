@@ -52,7 +52,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 	{{- range .Methods }}
 	  {{- $method := . }}
 	  {{- with access . }}
-	  fga.Register({{ $service.Name }}_{{ $method.Name }}_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
+	  fga.Register({{ $service.Name }}_{{ $method.Name }}_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
 			{{- if (need_getter .) }}
 			r, ok := req.(*{{ name $method.Input }})
 			if !ok {
@@ -60,11 +60,11 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			}
 			id := r.{{ getter . $method }}()
 			if id == "" {
-				return "", "", status.Error(codes.InvalidArgument, "{{ field . }} is required")
+				return "", "", "", status.Error(codes.InvalidArgument, "{{ field . }} is required")
 			}
-			return FGA{{ upperCamelCase .Type }}Object(id), FGA{{ upperCamelCase (printf "%s_%s" .Type .Check) }}, nil
+			return "{{ .Type }}", id, FGA{{ upperCamelCase (printf "%s_%s" .Type .Check) }}, nil
 			{{- else }}
-			return FGA{{ upperCamelCase .Type }}Type + ":" + "{{ .ID }}", FGA{{ upperCamelCase (printf "%s_%s" .Type .Check) }}, nil
+			return "{{ .Type }}", "{{ .ID }}", FGA{{ upperCamelCase (printf "%s_%s" .Type .Check) }}, nil
 			{{- end }}
     })
 	  {{- end }}

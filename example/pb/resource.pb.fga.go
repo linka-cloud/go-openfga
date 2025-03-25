@@ -66,46 +66,46 @@ var FGAModel string
 
 // RegisterFGA registers the ResourceService service with the provided FGA interceptors.
 func RegisterFGA(fga fgainterceptors.FGA) {
-	fga.Register(ResourceService_Create_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
-		return FGASystemType + ":" + "default", FGASystemCanCreateResource, nil
+	fga.Register(ResourceService_Create_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
+		return "system", "default", FGASystemCanCreateResource, nil
 	})
-	fga.Register(ResourceService_Read_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
+	fga.Register(ResourceService_Read_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
 		r, ok := req.(*ReadRequest)
 		if !ok {
 			panic("unexpected request type: expected ReadRequest")
 		}
 		id := r.GetID()
 		if id == "" {
-			return "", "", status.Error(codes.InvalidArgument, "id is required")
+			return "", "", "", status.Error(codes.InvalidArgument, "id is required")
 		}
-		return FGAResourceObject(id), FGAResourceCanRead, nil
+		return "resource", id, FGAResourceCanRead, nil
 	})
-	fga.Register(ResourceService_Update_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
+	fga.Register(ResourceService_Update_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
 		r, ok := req.(*UpdateRequest)
 		if !ok {
 			panic("unexpected request type: expected UpdateRequest")
 		}
 		id := r.GetResource().GetID()
 		if id == "" {
-			return "", "", status.Error(codes.InvalidArgument, "resource.id is required")
+			return "", "", "", status.Error(codes.InvalidArgument, "resource.id is required")
 		}
-		return FGAResourceObject(id), FGAResourceCanUpdate, nil
+		return "resource", id, FGAResourceCanUpdate, nil
 	})
-	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
+	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
 		r, ok := req.(*DeleteRequest)
 		if !ok {
 			panic("unexpected request type: expected DeleteRequest")
 		}
 		id := r.GetID()
 		if id == "" {
-			return "", "", status.Error(codes.InvalidArgument, "id is required")
+			return "", "", "", status.Error(codes.InvalidArgument, "id is required")
 		}
-		return FGAResourceObject(id), FGAResourceCanDelete, nil
+		return "resource", id, FGAResourceCanDelete, nil
 	})
-	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
-		return FGASystemType + ":" + "default", FGASystemCanListResources, nil
+	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
+		return "system", "default", FGASystemCanListResources, nil
 	})
-	fga.Register(ResourceService_Watch_FullMethodName, func(ctx context.Context, req any) (object string, relation string, err error) {
-		return FGASystemType + ":" + "default", FGASystemCanWatchResources, nil
+	fga.Register(ResourceService_Watch_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
+		return "system", "default", FGASystemCanWatchResources, nil
 	})
 }

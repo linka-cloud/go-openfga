@@ -25,7 +25,9 @@ import (
 	"go.linka.cloud/go-openfga"
 )
 
-type ObjectFunc func(ctx context.Context, req any) (object string, relation string, err error)
+type RegisterFunc func(fga FGA)
+
+type ObjectFunc func(ctx context.Context, req any) (objectType, objectID, relation string, err error)
 
 type UserFunc func(ctx context.Context) (string, map[string]any, error)
 
@@ -52,16 +54,17 @@ func New(_ context.Context, model openfga.Model, opts ...Option) (FGA, error) {
 	for _, v := range opts {
 		v(fga)
 	}
-	if fga.userFunc == nil {
+	if fga.user == nil {
 		return nil, errors.New("grpc openfga: missing user function")
 	}
 	return fga, nil
 }
 
 type fga struct {
-	reg      map[string]ObjectFunc
-	userFunc UserFunc
-	model    openfga.Model
+	reg       map[string]ObjectFunc
+	user      UserFunc
+	model     openfga.Model
+	normalize func(string) string
 }
 
 func (f *fga) Register(fqn string, obj ObjectFunc) {
@@ -107,7 +110,7 @@ func (f *fga) StreamClientInterceptor() grpc.StreamClientInterceptor {
 }
 
 func (f *fga) check(ctx context.Context, fullMethod string, req any) error {
-	u, kv, err := f.userFunc(ctx)
+	u, kv, err := f.user(ctx)
 	if err != nil {
 		return err
 	}
@@ -119,11 +122,14 @@ func (f *fga) check(ctx context.Context, fullMethod string, req any) error {
 	if !ok {
 		return status.Errorf(codes.Internal, "permission for '%s' not found", fullMethod)
 	}
-	o, r, err := fn(ctx, req)
+	t, id, r, err := fn(ctx, req)
 	if err != nil {
 		return err
 	}
-	granted, err := f.model.Check(ctx, o, r, u, kvs...)
+	if f.normalize != nil {
+		id = f.normalize(id)
+	}
+	granted, err := f.model.Check(ctx, t+":"+id, r, u, kvs...)
 	if err != nil {
 		return status.Errorf(codes.Internal, "permission check failed: %v", err)
 	}
