@@ -52,7 +52,7 @@ message Step {
   oneof relation {
     option(validate.required) = true;
     string check = 3 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
-    string as = 4 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+    string as = 4;
   }
   optional bool ignore_not_found = 5;
 }
