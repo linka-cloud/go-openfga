@@ -20,6 +20,19 @@ var (
 )
 
 const (
+	FGASystemType = "system"
+
+	FGASystemCanResourceCreate = "can_resource_create"
+	FGASystemCanResourceDelete = "can_resource_delete"
+	FGASystemCanResourceList   = "can_resource_list"
+	FGASystemCanResourceRead   = "can_resource_read"
+	FGASystemCanResourceUpdate = "can_resource_update"
+	FGASystemCanResourceWatch  = "can_resource_watch"
+	FGASystemResourceAdmin     = "resource_admin"
+	FGASystemResourceReader    = "resource_reader"
+	FGASystemResourceWatcher   = "resource_watcher"
+	FGASystemResourceWriter    = "resource_writer"
+
 	FGAResourceType = "resource"
 
 	FGAResourceAdmin      = "admin"
@@ -37,20 +50,12 @@ const (
 	FGASubCanRead  = "can_read"
 	FGASubReader   = "reader"
 	FGASubResource = "resource"
-
-	FGASystemType = "system"
-
-	FGASystemCanResourceCreate = "can_resource_create"
-	FGASystemCanResourceDelete = "can_resource_delete"
-	FGASystemCanResourceList   = "can_resource_list"
-	FGASystemCanResourceRead   = "can_resource_read"
-	FGASystemCanResourceUpdate = "can_resource_update"
-	FGASystemCanResourceWatch  = "can_resource_watch"
-	FGASystemResourceAdmin     = "resource_admin"
-	FGASystemResourceReader    = "resource_reader"
-	FGASystemResourceWatcher   = "resource_watcher"
-	FGASystemResourceWriter    = "resource_writer"
 )
+
+// FGASystemObject returns the object string for the system type, e.g. "system:id"
+func FGASystemObject(id string) string {
+	return FGASystemType + ":" + id
+}
 
 // FGAResourceObject returns the object string for the resource type, e.g. "resource:id"
 func FGAResourceObject(id string) string {
@@ -60,11 +65,6 @@ func FGAResourceObject(id string) string {
 // FGASubObject returns the object string for the sub type, e.g. "sub:id"
 func FGASubObject(id string) string {
 	return FGASubType + ":" + id
-}
-
-// FGASystemObject returns the object string for the system type, e.g. "system:id"
-func FGASystemObject(id string) string {
-	return FGASystemType + ":" + id
 }
 
 //go:embed resource.fga
@@ -83,8 +83,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Read_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -97,7 +97,6 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*ReadRequest)
@@ -124,8 +123,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Update_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -138,7 +137,6 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*UpdateRequest)
@@ -165,8 +163,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_AddSub_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -194,8 +192,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_ReadSub_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -216,7 +214,6 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*ReadSubRequest)
@@ -243,8 +240,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -257,7 +254,6 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*DeleteRequest)
@@ -284,8 +280,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -298,8 +294,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Watch_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -312,7 +308,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 			if !granted {
 				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 }
