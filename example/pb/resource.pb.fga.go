@@ -81,7 +81,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -95,7 +95,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -122,7 +122,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -136,7 +136,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -163,7 +163,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -192,7 +192,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -214,7 +214,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -241,7 +241,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -255,7 +255,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -282,7 +282,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -296,7 +296,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}
@@ -310,7 +310,7 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
 			return nil
 		}

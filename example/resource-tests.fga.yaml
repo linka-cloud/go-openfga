@@ -20,9 +20,9 @@ tests:
       resource_reader: true
       resource_writer: true
       resource_watcher: true
-      can_create_resource: true
-      can_list_resources: true
-      can_watch_resources: true
+      can_resource_create: true
+      can_resource_list: true
+      can_resource_watch: true
   - user: "user:admin"
     object: "resource:0"
     assertions:
@@ -37,7 +37,7 @@ tests:
     object: "system:default"
     assertions:
       resource_reader: true
-      can_list_resources: true
+      can_resource_list: true
   - user: "user:reader"
     object: "resource:0"
     assertions:
