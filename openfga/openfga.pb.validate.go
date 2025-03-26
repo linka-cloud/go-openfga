@@ -802,18 +802,7 @@ func (m *Step) validate(all bool) error {
 			errors = append(errors, err)
 		}
 		oneofRelationPresent = true
-
-		if !_Step_As_Pattern.MatchString(m.GetAs()) {
-			err := StepValidationError{
-				field:  "As",
-				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-
+		// no validation rules for As
 	default:
 		_ = v // ensures v is used
 	}
@@ -944,5 +933,3 @@ var _Step_Type_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
 var _Step_Id_Pattern = regexp.MustCompile("^[^:#@\\s]{1,254}$")
 
 var _Step_Check_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
-
-var _Step_As_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
