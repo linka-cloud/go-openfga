@@ -85,11 +85,7 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			for _, v := range s.Methods() {
 				m.Push(v.Name().String())
 				a := m.access(v)
-				if a == nil {
-					m.Pop()
-					continue
-				}
-				for _, vv := range a.Check {
+				for _, vv := range a.GetCheck() {
 					if vv.GetAs() != "" {
 						continue
 					}
@@ -178,7 +174,7 @@ func (m *Module) module(s pgs.Service) *openfga.Module {
 	for _, v := range s.Methods() {
 		m.Push(v.Name().String())
 		a := m.accessExt(v)
-		for _, vv := range a.Check {
+		for _, vv := range a.GetCheck() {
 			if vv == nil || vv.GetAs() == "" {
 				continue
 			}
