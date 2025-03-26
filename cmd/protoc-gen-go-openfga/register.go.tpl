@@ -90,9 +90,9 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				if !granted {
 					return status.Error(codes.PermissionDenied, msg)
 				}
-				return nil
 			}
 			{{- end }}
+			return nil
     })
 	  {{- end }}
 	{{- end }}

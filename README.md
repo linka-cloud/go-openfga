@@ -269,10 +269,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Read_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -283,9 +283,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*ReadRequest)
@@ -310,10 +309,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Update_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -324,9 +323,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*UpdateRequest)
@@ -351,10 +349,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_AddSub_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -380,10 +378,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_ReadSub_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -402,9 +400,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*ReadSubRequest)
@@ -429,10 +426,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -443,9 +440,8 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
 		{
 			r, ok := req.(*DeleteRequest)
@@ -470,10 +466,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -484,10 +480,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 	fga.Register(ResourceService_Watch_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
 		{
@@ -498,10 +494,10 @@ func RegisterFGA(fga fgainterceptors.FGA) {
 				return status.Errorf(codes.Internal, "permission check failed: %v", err)
 			}
 			if !granted {
-				return status.Errorf(codes.PermissionDenied, msg)
+				return status.Error(codes.PermissionDenied, msg)
 			}
-			return nil
 		}
+		return nil
 	})
 }
 
