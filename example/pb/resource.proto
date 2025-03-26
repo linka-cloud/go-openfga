@@ -1,17 +1,3 @@
-// Copyright 2025 Linka Cloud  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 syntax = "proto3";
 
 package resource;
@@ -23,7 +9,10 @@ import "patch/go.proto";
 
 option (go.lint).all = true;
 
+import "example/pb/types.proto";
+
 service ResourceService {
+  option (openfga.defaults) = { type: "system", id: "default" };
   option (openfga.module) = {
     name: "resource",
     extends: [ {
@@ -32,10 +21,7 @@ service ResourceService {
         { define: "resource_admin", as: "[user, user with non_expired_grant] or admin" },
         { define: "resource_writer", as: "[user] or resource_admin" },
         { define: "resource_reader", as: "[user] or resource_admin or reader" },
-        { define: "resource_watcher", as: "[user] or resource_admin or watcher" },
-        { define: "can_create_resource", as: "resource_writer" },
-        { define: "can_list_resources", as: "resource_reader" },
-        { define: "can_watch_resources", as: "resource_watcher" }
+        { define: "resource_watcher", as: "[user] or resource_admin or watcher" }
       ]
     } ],
     definitions: [ {
@@ -43,83 +29,48 @@ service ResourceService {
       relations: [
         { define: "system", as: "[system]" },
         { define: "admin", as: "[user] or resource_admin from system" },
-        { define: "reader", as: "[user] or resource_reader from system" },
-        { define: "can_read", as: "reader" },
-        { define: "can_update", as: "admin" },
-        { define: "can_delete", as: "admin" }
+        { define: "reader", as: "[user] or resource_reader from system" }
+      ]
+    }, {
+      type: "sub",
+      relations: [
+        { define: "resource", as: "[resource]" },
+        { define: "admin", as: "[user] or admin from resource" },
+        { define: "reader", as: "[user] or reader from resource" }
       ]
     } ],
     conditions: [ "non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) { current_time < grant_time + grant_duration }" ]
   };
   rpc Create (CreateRequest) returns (CreateResponse) {
-    option (openfga.access) = { type: "system", id: "default", check: "can_create_resource" };
+    option (openfga.access) = { check: [ { as: "resource_writer" } ] };
   };
   rpc Read (ReadRequest) returns (ReadResponse) {
-    option (openfga.access) = { type: "resource", id: "{id}", check: "can_read" };
+    option (openfga.access) = { check: [ { as: "resource_reader" }, { type: "resource", id: "{id}" as: "reader" } ] };
   }
   rpc Update (UpdateRequest) returns (UpdateResponse) {
-    option (openfga.access) = { type: "resource", id: "{resource.id}", check: "can_update" };
+    option (openfga.access) = { check: [ { as: "resource_writer" }, { type: "resource", id: "{resource.id}" as: "admin" } ] };
+  }
+  rpc AddSub (AddSubRequest) returns (AddSubResponse) {
+    option (openfga.access) = { check: [
+//      { as: "resource_writer" },
+      { type: "resource", id: "{id}" as: "admin" }
+    ] };
+  }
+  rpc ReadSub (ReadSubRequest) returns (ReadSubResponse) {
+    option (openfga.access) = { check: [
+//      { as: "resource_reader" },
+      { type: "resource", id: "{resource_id}" as: "reader", ignore_not_found: true },
+      { type: "sub", id: "{id}" as: "reader" }
+    ] };
   }
   rpc Delete(DeleteRequest) returns (DeleteResponse) {
-    option (openfga.access) = { type: "resource", id: "{id}", check: "can_delete" };
+    option (openfga.access) = { check: [ { as: "resource_writer" }, { type: "resource", id: "{id}" as: "admin" } ] };
   }
   rpc List(ListRequest) returns (ListResponse) {
-    option (openfga.access) = { type: "system", id: "default", check: "can_list_resources" };
+    option (openfga.access) = { check: [ { as: "resource_reader" } ] };
   }
   rpc Watch(WatchRequest) returns (stream Event) {
-    option (openfga.access) = { type: "system", id: "default", check: "can_watch_resources" };
+    option (openfga.access) = { check: [ { as: "resource_watcher" } ] };
   }
 }
 
-message CreateRequest {
-  Resource resource = 1;
-}
-
-message CreateResponse {
-  Resource resource = 1;
-}
-
-message ReadRequest {
-  string id = 1;
-}
-
-message ReadResponse {
-  Resource resource = 1;
-}
-
-message UpdateRequest {
-  Resource resource = 1;
-}
-
-message UpdateResponse {
-  Resource resource = 1;
-}
-
-message DeleteRequest {
-  string id = 1;
-}
-
-message DeleteResponse { }
-
-message ListRequest { }
-
-message ListResponse {
-  repeated Resource resources = 1;
-}
-
-message WatchRequest { }
-
-message Event {
-  enum Type {
-    NONE = 0;
-    CREATE = 1;
-    UPDATE = 2;
-    DELETE = 3;
-  }
-  Type type = 1;
-  Resource resource = 2;
-}
-
-message Resource {
-  string id = 1;
-}

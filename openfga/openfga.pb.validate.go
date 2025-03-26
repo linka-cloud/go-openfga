@@ -214,6 +214,144 @@ var _ interface {
 
 var _Module_Name_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
 
+// Validate checks the field values on DefaultAccess with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DefaultAccess) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DefaultAccess with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DefaultAccessMultiError, or
+// nil if none found.
+func (m *DefaultAccess) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DefaultAccess) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.Type != nil {
+
+		if !_DefaultAccess_Type_Pattern.MatchString(m.GetType()) {
+			err := DefaultAccessValidationError{
+				field:  "Type",
+				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if m.ID != nil {
+
+		if !_DefaultAccess_Id_Pattern.MatchString(m.GetID()) {
+			err := DefaultAccessValidationError{
+				field:  "Id",
+				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,254}$\"",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if m.IgnoreNotFound != nil {
+		// no validation rules for IgnoreNotFound
+	}
+
+	if len(errors) > 0 {
+		return DefaultAccessMultiError(errors)
+	}
+
+	return nil
+}
+
+// DefaultAccessMultiError is an error wrapping multiple validation errors
+// returned by DefaultAccess.ValidateAll() if the designated constraints
+// aren't met.
+type DefaultAccessMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DefaultAccessMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DefaultAccessMultiError) AllErrors() []error { return m }
+
+// DefaultAccessValidationError is the validation error returned by
+// DefaultAccess.Validate if the designated constraints aren't met.
+type DefaultAccessValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DefaultAccessValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DefaultAccessValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DefaultAccessValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DefaultAccessValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DefaultAccessValidationError) ErrorName() string { return "DefaultAccessValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DefaultAccessValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDefaultAccess.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DefaultAccessValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DefaultAccessValidationError{}
+
+var _DefaultAccess_Type_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
+
+var _DefaultAccess_Id_Pattern = regexp.MustCompile("^[^:#@\\s]{1,254}$")
+
 // Validate checks the field values on Type with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.
@@ -494,37 +632,38 @@ func (m *Access) validate(all bool) error {
 
 	var errors []error
 
-	if !_Access_Type_Pattern.MatchString(m.GetType()) {
-		err := AccessValidationError{
-			field:  "Type",
-			reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	for idx, item := range m.GetCheck() {
+		_, _ = idx, item
 
-	if !_Access_Id_Pattern.MatchString(m.GetID()) {
-		err := AccessValidationError{
-			field:  "Id",
-			reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,254}$\"",
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, AccessValidationError{
+						field:  fmt.Sprintf("Check[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, AccessValidationError{
+						field:  fmt.Sprintf("Check[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return AccessValidationError{
+					field:  fmt.Sprintf("Check[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
 		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
 
-	if !_Access_Check_Pattern.MatchString(m.GetCheck()) {
-		err := AccessValidationError{
-			field:  "Check",
-			reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,254}$\"",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
 	}
 
 	if len(errors) > 0 {
@@ -604,8 +743,206 @@ var _ interface {
 	ErrorName() string
 } = AccessValidationError{}
 
-var _Access_Type_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
+// Validate checks the field values on Step with the rules defined in the proto
+// definition for this message. If any rules are violated, the first error
+// encountered is returned, or nil if there are no violations.
+func (m *Step) Validate() error {
+	return m.validate(false)
+}
 
-var _Access_Id_Pattern = regexp.MustCompile("^[^:#@\\s]{1,254}$")
+// ValidateAll checks the field values on Step with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in StepMultiError, or nil if none found.
+func (m *Step) ValidateAll() error {
+	return m.validate(true)
+}
 
-var _Access_Check_Pattern = regexp.MustCompile("^[^:#@\\s]{1,254}$")
+func (m *Step) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	oneofRelationPresent := false
+	switch v := m.Relation.(type) {
+	case *Step_Check:
+		if v == nil {
+			err := StepValidationError{
+				field:  "Relation",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofRelationPresent = true
+
+		if !_Step_Check_Pattern.MatchString(m.GetCheck()) {
+			err := StepValidationError{
+				field:  "Check",
+				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	case *Step_As:
+		if v == nil {
+			err := StepValidationError{
+				field:  "Relation",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofRelationPresent = true
+
+		if !_Step_As_Pattern.MatchString(m.GetAs()) {
+			err := StepValidationError{
+				field:  "As",
+				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+	if !oneofRelationPresent {
+		err := StepValidationError{
+			field:  "Relation",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.Type != nil {
+
+		if !_Step_Type_Pattern.MatchString(m.GetType()) {
+			err := StepValidationError{
+				field:  "Type",
+				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,50}$\"",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if m.ID != nil {
+
+		if !_Step_Id_Pattern.MatchString(m.GetID()) {
+			err := StepValidationError{
+				field:  "Id",
+				reason: "value does not match regex pattern \"^[^:#@\\\\s]{1,254}$\"",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if m.IgnoreNotFound != nil {
+		// no validation rules for IgnoreNotFound
+	}
+
+	if len(errors) > 0 {
+		return StepMultiError(errors)
+	}
+
+	return nil
+}
+
+// StepMultiError is an error wrapping multiple validation errors returned by
+// Step.ValidateAll() if the designated constraints aren't met.
+type StepMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StepMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StepMultiError) AllErrors() []error { return m }
+
+// StepValidationError is the validation error returned by Step.Validate if the
+// designated constraints aren't met.
+type StepValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StepValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StepValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StepValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StepValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StepValidationError) ErrorName() string { return "StepValidationError" }
+
+// Error satisfies the builtin error interface
+func (e StepValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStep.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StepValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StepValidationError{}
+
+var _Step_Type_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
+
+var _Step_Id_Pattern = regexp.MustCompile("^[^:#@\\s]{1,254}$")
+
+var _Step_Check_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")
+
+var _Step_As_Pattern = regexp.MustCompile("^[^:#@\\s]{1,50}$")

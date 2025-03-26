@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package resource;
+
+option go_package = "./resource";
+
+import "patch/go.proto";
+
+option (go.lint).all = true;
+
+message CreateRequest {
+  Resource resource = 1;
+}
+
+message CreateResponse {
+  Resource resource = 1;
+}
+
+message ReadRequest {
+  string id = 1;
+}
+
+message ReadResponse {
+  Resource resource = 1;
+}
+
+message UpdateRequest {
+  Resource resource = 1;
+}
+
+message UpdateResponse {
+  Resource resource = 1;
+}
+
+message AddSubRequest {
+  string id = 1;
+  Sub sub = 2;
+}
+
+message AddSubResponse {
+  Resource resource = 1;
+}
+
+message ReadSubRequest {
+  string resource_id = 1;
+  string id = 2;
+}
+
+message ReadSubResponse {
+  Sub sub = 1;
+}
+
+message DeleteRequest {
+  string id = 1;
+}
+
+message DeleteResponse { }
+
+message ListRequest { }
+
+message ListResponse {
+  repeated Resource resources = 1;
+}
+
+message WatchRequest { }
+
+message Event {
+  enum Type {
+    NONE = 0;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
+  }
+  Type type = 1;
+  Resource resource = 2;
+}
+
+message Resource {
+  string id = 1;
+}
+
+message Sub {
+  string id = 1;
+}

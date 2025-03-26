@@ -27,13 +27,19 @@ import (
 
 type RegisterFunc func(fga FGA)
 
-type ObjectFunc func(ctx context.Context, req any) (objectType, objectID, relation string, err error)
+type CheckFunc func(ctx context.Context, req any, user string, kvs ...any) error
 
 type UserFunc func(ctx context.Context) (string, map[string]any, error)
 
 type FGA interface {
 	Interceptors
-	Register(fqn string, obj ObjectFunc)
+	Register(fqn string, obj CheckFunc)
+	// Normalize can be used to normalize object ID
+	Normalize(id string) string
+	// Check checks if the user has the relation to the object
+	Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error)
+	// Has checks if the object exists, it can be used to be able to return "not found" errors
+	Has(ctx context.Context, object string) (bool, error)
 }
 
 type Interceptors interface {
@@ -48,7 +54,7 @@ func New(_ context.Context, model openfga.Model, opts ...Option) (FGA, error) {
 		return nil, errors.New("model is nil")
 	}
 	fga := &fga{
-		reg:   make(map[string]ObjectFunc),
+		reg:   make(map[string]CheckFunc),
 		model: model,
 	}
 	for _, v := range opts {
@@ -57,17 +63,33 @@ func New(_ context.Context, model openfga.Model, opts ...Option) (FGA, error) {
 	if fga.user == nil {
 		return nil, errors.New("grpc openfga: missing user function")
 	}
+	if fga.normalize == nil {
+		fga.normalize = func(s string) string { return s }
+	}
 	return fga, nil
 }
 
 type fga struct {
-	reg       map[string]ObjectFunc
+	reg       map[string]CheckFunc
 	user      UserFunc
 	model     openfga.Model
 	normalize func(string) string
 }
 
-func (f *fga) Register(fqn string, obj ObjectFunc) {
+func (f *fga) Normalize(id string) string {
+	return f.normalize(id)
+}
+
+func (f *fga) Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error) {
+	return f.model.Check(ctx, object, relation, user, contextKVs...)
+}
+
+func (f *fga) Has(ctx context.Context, object string) (bool, error) {
+	out, _, err := f.model.ReadWithPaging(ctx, object, "", "", 1, "")
+	return len(out) != 0, err
+}
+
+func (f *fga) Register(fqn string, obj CheckFunc) {
 	f.reg[fqn] = obj
 }
 
@@ -122,21 +144,7 @@ func (f *fga) check(ctx context.Context, fullMethod string, req any) error {
 	if !ok {
 		return status.Errorf(codes.Internal, "permission for '%s' not found", fullMethod)
 	}
-	t, id, r, err := fn(ctx, req)
-	if err != nil {
-		return err
-	}
-	if f.normalize != nil {
-		id = f.normalize(id)
-	}
-	granted, err := f.model.Check(ctx, t+":"+id, r, u, kvs...)
-	if err != nil {
-		return status.Errorf(codes.Internal, "permission check failed: %v", err)
-	}
-	if !granted {
-		return status.Errorf(codes.PermissionDenied, "[%s]: not allowed to call %s", u, fullMethod)
-	}
-	return nil
+	return fn(ctx, req, u, kvs...)
 }
 
 type wrapper struct {

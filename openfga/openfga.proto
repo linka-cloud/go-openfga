@@ -12,6 +12,7 @@ option (go.lint).all = true;
 
 extend google.protobuf.ServiceOptions {
   Module module = 14242;
+  DefaultAccess defaults = 14243;
 }
 
 extend google.protobuf.MethodOptions {
@@ -25,6 +26,12 @@ message Module {
   repeated string conditions = 4;
 }
 
+message DefaultAccess {
+  optional string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  optional string id = 2 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+  optional bool ignore_not_found = 3;
+}
+
 message Type {
   string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
   repeated Relation relations = 2;
@@ -36,8 +43,16 @@ message Relation {
 }
 
 message Access {
-  string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
-  string id = 2 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
-  string check = 3 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+  repeated Step check = 1;
 }
 
+message Step {
+  optional string type = 1 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  optional string id = 2 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,254}$" } ];
+  oneof relation {
+    option(validate.required) = true;
+    string check = 3 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+    string as = 4 [ (validate.rules).string = { pattern: "^[^:#@\\s]{1,50}$" } ];
+  }
+  optional bool ignore_not_found = 5;
+}

@@ -8,9 +8,12 @@ extend type system
     define resource_writer: [user] or resource_admin
     define resource_reader: [user] or resource_admin or reader
     define resource_watcher: [user] or resource_admin or watcher
-    define can_create_resource: resource_writer
-    define can_list_resources: resource_reader
-    define can_watch_resources: resource_watcher
+    define can_resource_create: resource_writer
+    define can_resource_read: resource_reader
+    define can_resource_update: resource_writer
+    define can_resource_delete: resource_writer
+    define can_resource_list: resource_reader
+    define can_resource_watch: resource_watcher
 
 type resource
   relations
@@ -19,6 +22,14 @@ type resource
     define reader: [user] or resource_reader from system
     define can_read: reader
     define can_update: admin
+    define can_add_sub: admin
+    define can_read_sub: reader
     define can_delete: admin
+type sub
+  relations
+    define resource: [resource]
+    define admin: [user] or admin from resource
+    define reader: [user] or reader from resource
+    define can_read: reader
 
 condition non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) { current_time < grant_time + grant_duration }
