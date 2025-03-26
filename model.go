@@ -27,6 +27,7 @@ import (
 	"github.com/openfga/openfga/pkg/tuple"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const SchemaVersion = "1.2"
@@ -69,6 +70,18 @@ func (m *model) Read(ctx context.Context, object, relation, user string) ([]*ope
 		TupleKey: &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
 	})
 	return res.GetTuples(), err
+}
+
+func (m *model) ReadWithPaging(ctx context.Context, object, relation, user string, pageSize int32, continuationToken string) ([]*openfgav1.Tuple, string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	res, err := m.s.c.c.Read(ctx, &openfgav1.ReadRequest{
+		StoreId:           m.s.id,
+		TupleKey:          &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
+		PageSize:          wrapperspb.Int32(pageSize),
+		ContinuationToken: continuationToken,
+	})
+	return res.GetTuples(), res.GetContinuationToken(), err
 }
 
 func (m *model) Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error) {

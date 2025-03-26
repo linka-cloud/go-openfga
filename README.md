@@ -52,11 +52,12 @@ module base
 type system
   relations
     define admin: [user]
-    define writer: [user]
-    define reader: [user]
-    define watcher: [user]
+    define writer: [user] or admin
+    define reader: [user] or admin
+    define watcher: [user] or admin
 
 type user
+
 ```
 
 For a given [`resource.proto`](example/pb/resource.proto):
@@ -64,16 +65,19 @@ For a given [`resource.proto`](example/pb/resource.proto):
 ```protobuf
 syntax = "proto3";
 
-package example;
+package resource;
 
-option go_package = "./example";
+option go_package = "./resource";
 
 import "openfga/openfga.proto";
 import "patch/go.proto";
 
 option (go.lint).all = true;
 
+import "example/pb/types.proto";
+
 service ResourceService {
+  option (openfga.defaults) = { type: "system", id: "default" };
   option (openfga.module) = {
     name: "resource",
     extends: [ {
@@ -82,10 +86,7 @@ service ResourceService {
         { define: "resource_admin", as: "[user, user with non_expired_grant] or admin" },
         { define: "resource_writer", as: "[user] or resource_admin" },
         { define: "resource_reader", as: "[user] or resource_admin or reader" },
-        { define: "resource_watcher", as: "[user] or resource_admin or watcher" },
-        { define: "can_create_resource", as: "resource_writer" },
-        { define: "can_list_resources", as: "resource_reader" },
-        { define: "can_watch_resources", as: "resource_watcher" }
+        { define: "resource_watcher", as: "[user] or resource_admin or watcher" }
       ]
     } ],
     definitions: [ {
@@ -93,35 +94,52 @@ service ResourceService {
       relations: [
         { define: "system", as: "[system]" },
         { define: "admin", as: "[user] or resource_admin from system" },
-        { define: "reader", as: "[user] or resource_reader from system" },
-        { define: "can_read", as: "reader" },
-        { define: "can_update", as: "admin" },
-        { define: "can_delete", as: "admin" }
+        { define: "reader", as: "[user] or resource_reader from system" }
+      ]
+    }, {
+      type: "sub",
+      relations: [
+        { define: "resource", as: "[resource]" },
+        { define: "admin", as: "[user] or admin from resource" },
+        { define: "reader", as: "[user] or reader from resource" }
       ]
     } ],
     conditions: [ "non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) { current_time < grant_time + grant_duration }" ]
   };
   rpc Create (CreateRequest) returns (CreateResponse) {
-    option (openfga.access) = { type: "system", id: "default", check: "can_create_resource" };
+    option (openfga.access) = { check: [ { as: "resource_writer" } ] };
   };
   rpc Read (ReadRequest) returns (ReadResponse) {
-    option (openfga.access) = { type: "resource", id: "{id}", check: "can_read" };
+    option (openfga.access) = { check: [ { as: "resource_reader" }, { type: "resource", id: "{id}" as: "reader" } ] };
   }
   rpc Update (UpdateRequest) returns (UpdateResponse) {
-    option (openfga.access) = { type: "resource", id: "{resource.id}", check: "can_update" };
+    option (openfga.access) = { check: [ { as: "resource_writer" }, { type: "resource", id: "{resource.id}" as: "admin" } ] };
+  }
+  rpc AddSub (AddSubRequest) returns (AddSubResponse) {
+    option (openfga.access) = { check: [
+//      { as: "resource_writer" },
+      { type: "resource", id: "{id}" as: "admin" }
+    ] };
+  }
+  rpc ReadSub (ReadSubRequest) returns (ReadSubResponse) {
+    option (openfga.access) = { check: [
+//      { as: "resource_reader" },
+      { type: "resource", id: "{resource_id}" as: "reader", ignore_not_found: true },
+      { type: "sub", id: "{id}" as: "reader" }
+    ] };
   }
   rpc Delete(DeleteRequest) returns (DeleteResponse) {
-    option (openfga.access) = { type: "resource", id: "{id}", check: "can_delete" };
+    option (openfga.access) = { check: [ { as: "resource_writer" }, { type: "resource", id: "{id}" as: "admin" } ] };
   }
   rpc List(ListRequest) returns (ListResponse) {
-    option (openfga.access) = { type: "system", id: "default", check: "can_list_resources" };
+    option (openfga.access) = { check: [ { as: "resource_reader" } ] };
   }
   rpc Watch(WatchRequest) returns (stream Event) {
-    option (openfga.access) = { type: "system", id: "default", check: "can_watch_resources" };
+    option (openfga.access) = { check: [ { as: "resource_watcher" } ] };
   }
 }
 
-// ... requests, responses and event definitions ...
+
 ```
 
 The following [`resource.fga`](example/pb/resource.fga) `openfga` module will be generated:
@@ -137,9 +155,12 @@ extend type system
     define resource_writer: [user] or resource_admin
     define resource_reader: [user] or resource_admin or reader
     define resource_watcher: [user] or resource_admin or watcher
-    define can_create_resource: resource_writer
-    define can_list_resources: resource_reader
-    define can_watch_resources: resource_watcher
+    define can_resource_create: resource_writer
+    define can_resource_read: resource_reader
+    define can_resource_update: resource_writer
+    define can_resource_delete: resource_writer
+    define can_resource_list: resource_reader
+    define can_resource_watch: resource_watcher
 
 type resource
   relations
@@ -148,7 +169,15 @@ type resource
     define reader: [user] or resource_reader from system
     define can_read: reader
     define can_update: admin
+    define can_add_sub: admin
+    define can_read_sub: reader
     define can_delete: admin
+type sub
+  relations
+    define resource: [resource]
+    define admin: [user] or admin from resource
+    define reader: [user] or reader from resource
+    define can_read: reader
 
 condition non_expired_grant(current_time: timestamp, grant_time: timestamp, grant_duration: duration) { current_time < grant_time + grant_duration }
 
@@ -163,6 +192,7 @@ package resource
 import (
 	"context"
 	_ "embed"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -173,14 +203,19 @@ import (
 var (
 	_ = codes.OK
 	_ = status.New
+	_ = fmt.Sprintf
+	_ = context.Canceled
 )
 
 const (
 	FGASystemType = "system"
 
-	FGASystemCanCreateResource = "can_create_resource"
-	FGASystemCanListResources  = "can_list_resources"
-	FGASystemCanWatchResources = "can_watch_resources"
+	FGASystemCanResourceCreate = "can_resource_create"
+	FGASystemCanResourceDelete = "can_resource_delete"
+	FGASystemCanResourceList   = "can_resource_list"
+	FGASystemCanResourceRead   = "can_resource_read"
+	FGASystemCanResourceUpdate = "can_resource_update"
+	FGASystemCanResourceWatch  = "can_resource_watch"
 	FGASystemResourceAdmin     = "resource_admin"
 	FGASystemResourceReader    = "resource_reader"
 	FGASystemResourceWatcher   = "resource_watcher"
@@ -188,12 +223,21 @@ const (
 
 	FGAResourceType = "resource"
 
-	FGAResourceAdmin     = "admin"
-	FGAResourceCanDelete = "can_delete"
-	FGAResourceCanRead   = "can_read"
-	FGAResourceCanUpdate = "can_update"
-	FGAResourceReader    = "reader"
-	FGAResourceSystem    = "system"
+	FGAResourceAdmin      = "admin"
+	FGAResourceCanAddSub  = "can_add_sub"
+	FGAResourceCanDelete  = "can_delete"
+	FGAResourceCanRead    = "can_read"
+	FGAResourceCanReadSub = "can_read_sub"
+	FGAResourceCanUpdate  = "can_update"
+	FGAResourceReader     = "reader"
+	FGAResourceSystem     = "system"
+
+	FGASubType = "sub"
+
+	FGASubAdmin    = "admin"
+	FGASubCanRead  = "can_read"
+	FGASubReader   = "reader"
+	FGASubResource = "resource"
 )
 
 // FGASystemObject returns the object string for the system type, e.g. "system:id"
@@ -206,54 +250,261 @@ func FGAResourceObject(id string) string {
 	return FGAResourceType + ":" + id
 }
 
+// FGASubObject returns the object string for the sub type, e.g. "sub:id"
+func FGASubObject(id string) string {
+	return FGASubType + ":" + id
+}
+
 //go:embed resource.fga
 var FGAModel string
 
 // RegisterFGA registers the ResourceService service with the provided FGA interceptors.
 func RegisterFGA(fga fgainterceptors.FGA) {
-	fga.Register(ResourceService_Create_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
-		return "system", "default", FGASystemCanCreateResource, nil
+	fga.Register(ResourceService_Create_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			object := "system" + ":" + fga.Normalize("default")
+			msg := fmt.Sprintf("[%s]: not allowed to call %s", user, ResourceService_Create_FullMethodName)
+			granted, err := fga.Check(ctx, object, FGASystemCanResourceCreate, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
+		}
 	})
-	fga.Register(ResourceService_Read_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
-		r, ok := req.(*ReadRequest)
-		if !ok {
-			panic("unexpected request type: expected ReadRequest")
+	fga.Register(ResourceService_Read_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			object := "system" + ":" + fga.Normalize("default")
+			msg := fmt.Sprintf("[%s]: not allowed to call %s", user, ResourceService_Read_FullMethodName)
+			granted, err := fga.Check(ctx, object, FGASystemCanResourceRead, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
 		}
-		id := r.GetID()
-		if id == "" {
-			return "", "", "", status.Error(codes.InvalidArgument, "id is required")
+		{
+			r, ok := req.(*ReadRequest)
+			if !ok {
+				panic("unexpected request type: expected ReadRequest")
+			}
+			id := r.GetID()
+			if id == "" {
+				return status.Error(codes.InvalidArgument, "id is required")
+			}
+			object := "resource" + ":" + fga.Normalize(id)
+			ok, err := fga.Has(ctx, object)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !ok {
+				return status.Errorf(codes.NotFound, "resource %q not found", id)
+			}
+			msg := fmt.Sprintf("[%s]: not allowed to call %s on resource %q", user, ResourceService_Read_FullMethodName, id)
+			granted, err := fga.Check(ctx, object, FGAResourceCanRead, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
 		}
-		return "resource", id, FGAResourceCanRead, nil
 	})
-	fga.Register(ResourceService_Update_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
-		r, ok := req.(*UpdateRequest)
-		if !ok {
-			panic("unexpected request type: expected UpdateRequest")
+	fga.Register(ResourceService_Update_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			object := "system" + ":" + fga.Normalize("default")
+			msg := fmt.Sprintf("[%s]: not allowed to call %s", user, ResourceService_Update_FullMethodName)
+			granted, err := fga.Check(ctx, object, FGASystemCanResourceUpdate, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
 		}
-		id := r.GetResource().GetID()
-		if id == "" {
-			return "", "", "", status.Error(codes.InvalidArgument, "resource.id is required")
+		{
+			r, ok := req.(*UpdateRequest)
+			if !ok {
+				panic("unexpected request type: expected UpdateRequest")
+			}
+			id := r.GetResource().GetID()
+			if id == "" {
+				return status.Error(codes.InvalidArgument, "resource.id is required")
+			}
+			object := "resource" + ":" + fga.Normalize(id)
+			ok, err := fga.Has(ctx, object)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !ok {
+				return status.Errorf(codes.NotFound, "resource %q not found", id)
+			}
+			msg := fmt.Sprintf("[%s]: not allowed to call %s on resource %q", user, ResourceService_Update_FullMethodName, id)
+			granted, err := fga.Check(ctx, object, FGAResourceCanUpdate, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
 		}
-		return "resource", id, FGAResourceCanUpdate, nil
 	})
-	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
-		r, ok := req.(*DeleteRequest)
-		if !ok {
-			panic("unexpected request type: expected DeleteRequest")
+	fga.Register(ResourceService_AddSub_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			r, ok := req.(*AddSubRequest)
+			if !ok {
+				panic("unexpected request type: expected AddSubRequest")
+			}
+			id := r.GetID()
+			if id == "" {
+				return status.Error(codes.InvalidArgument, "id is required")
+			}
+			object := "resource" + ":" + fga.Normalize(id)
+			ok, err := fga.Has(ctx, object)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !ok {
+				return status.Errorf(codes.NotFound, "resource %q not found", id)
+			}
+			msg := fmt.Sprintf("[%s]: not allowed to call %s on resource %q", user, ResourceService_AddSub_FullMethodName, id)
+			granted, err := fga.Check(ctx, object, FGAResourceCanAddSub, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
 		}
-		id := r.GetID()
-		if id == "" {
-			return "", "", "", status.Error(codes.InvalidArgument, "id is required")
+	})
+	fga.Register(ResourceService_ReadSub_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			r, ok := req.(*ReadSubRequest)
+			if !ok {
+				panic("unexpected request type: expected ReadSubRequest")
+			}
+			id := r.GetResourceID()
+			if id == "" {
+				return status.Error(codes.InvalidArgument, "resource_id is required")
+			}
+			object := "resource" + ":" + fga.Normalize(id)
+			msg := fmt.Sprintf("[%s]: not allowed to call %s on resource %q", user, ResourceService_ReadSub_FullMethodName, id)
+			granted, err := fga.Check(ctx, object, FGAResourceCanReadSub, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
 		}
-		return "resource", id, FGAResourceCanDelete, nil
+		{
+			r, ok := req.(*ReadSubRequest)
+			if !ok {
+				panic("unexpected request type: expected ReadSubRequest")
+			}
+			id := r.GetID()
+			if id == "" {
+				return status.Error(codes.InvalidArgument, "id is required")
+			}
+			object := "sub" + ":" + fga.Normalize(id)
+			ok, err := fga.Has(ctx, object)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !ok {
+				return status.Errorf(codes.NotFound, "sub %q not found", id)
+			}
+			msg := fmt.Sprintf("[%s]: not allowed to call %s on sub %q", user, ResourceService_ReadSub_FullMethodName, id)
+			granted, err := fga.Check(ctx, object, FGASubCanRead, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
+		}
 	})
-	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
-		return "system", "default", FGASystemCanListResources, nil
+	fga.Register(ResourceService_Delete_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			object := "system" + ":" + fga.Normalize("default")
+			msg := fmt.Sprintf("[%s]: not allowed to call %s", user, ResourceService_Delete_FullMethodName)
+			granted, err := fga.Check(ctx, object, FGASystemCanResourceDelete, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
+		}
+		{
+			r, ok := req.(*DeleteRequest)
+			if !ok {
+				panic("unexpected request type: expected DeleteRequest")
+			}
+			id := r.GetID()
+			if id == "" {
+				return status.Error(codes.InvalidArgument, "id is required")
+			}
+			object := "resource" + ":" + fga.Normalize(id)
+			ok, err := fga.Has(ctx, object)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !ok {
+				return status.Errorf(codes.NotFound, "resource %q not found", id)
+			}
+			msg := fmt.Sprintf("[%s]: not allowed to call %s on resource %q", user, ResourceService_Delete_FullMethodName, id)
+			granted, err := fga.Check(ctx, object, FGAResourceCanDelete, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
+		}
 	})
-	fga.Register(ResourceService_Watch_FullMethodName, func(ctx context.Context, req any) (objectType, objectID, relation string, err error) {
-		return "system", "default", FGASystemCanWatchResources, nil
+	fga.Register(ResourceService_List_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			object := "system" + ":" + fga.Normalize("default")
+			msg := fmt.Sprintf("[%s]: not allowed to call %s", user, ResourceService_List_FullMethodName)
+			granted, err := fga.Check(ctx, object, FGASystemCanResourceList, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
+		}
+	})
+	fga.Register(ResourceService_Watch_FullMethodName, func(ctx context.Context, req any, user string, kvs ...any) error {
+		{
+			object := "system" + ":" + fga.Normalize("default")
+			msg := fmt.Sprintf("[%s]: not allowed to call %s", user, ResourceService_Watch_FullMethodName)
+			granted, err := fga.Check(ctx, object, FGASystemCanResourceWatch, user, kvs...)
+			if err != nil {
+				return status.Errorf(codes.Internal, "permission check failed: %v", err)
+			}
+			if !granted {
+				return status.Errorf(codes.PermissionDenied, msg)
+			}
+			return nil
+		}
 	})
 }
+
 ```
 
 ### Usage
@@ -421,4 +672,5 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
 ```

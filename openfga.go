@@ -46,6 +46,7 @@ type Model interface {
 	Show() (string, error)
 
 	Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error)
+	ReadWithPaging(ctx context.Context, object, relation, user string, pageSize int32, continuationToken string) ([]*openfgav1.Tuple, string, error)
 	Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error)
 	ListObjects(ctx context.Context, typ, relation, user string) ([]string, error)
 	ListUsers(ctx context.Context, object, relation, userTyp string, contextKVs ...any) ([]string, error)

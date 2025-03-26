@@ -70,6 +70,8 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 		},
 		"module": m.module,
 		"types": func(s pgs.Service) []Type {
+			m.Push(s.Name().String())
+			defer m.Pop()
 			t := make(map[string]Type)
 			mod := m.module(s)
 			if mod != nil {
@@ -81,14 +83,24 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 				}
 			}
 			for _, v := range s.Methods() {
-				if a := m.access(v); a != nil {
-					if _, ok := t[a.Type]; !ok {
-						t[a.Type] = Type{Name: a.Type, Relations: make(map[string]struct{})}
+				m.Push(v.Name().String())
+				a := m.access(v)
+				if a == nil {
+					m.Pop()
+					continue
+				}
+				for _, vv := range a.Check {
+					if vv.GetAs() != "" {
+						continue
 					}
-					if _, ok := t[a.Type].Relations[a.Check]; !ok {
-						t[a.Type].Relations[a.Check] = struct{}{}
+					if _, ok := t[vv.GetType()]; !ok {
+						t[vv.GetType()] = Type{Name: vv.GetType(), Relations: make(map[string]struct{})}
+					}
+					if _, ok := t[vv.GetType()].Relations[vv.GetCheck()]; !ok {
+						t[vv.GetType()].Relations[vv.GetCheck()] = struct{}{}
 					}
 				}
+				m.Pop()
 			}
 			var out []Type
 			for _, v := range t {
@@ -97,15 +109,21 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			return out
 		},
 		"access": m.access,
-		"need_getter": func(a *openfga.Access) bool {
-			return len(a.ID) >= 2 && a.ID[0] == '{' && a.ID[len(a.ID)-1] == '}'
+		"need_getter": func(s *openfga.Step) bool {
+			id := s.GetID()
+			return len(id) >= 2 && id[0] == '{' && id[len(id)-1] == '}'
 		},
-		"field": func(a *openfga.Access) string {
-			return a.ID[1 : len(a.ID)-1]
+		"field": func(s *openfga.Step) string {
+			id := s.GetID()
+			if len(id) < 2 || id[0] != '{' || id[len(id)-1] != '}' {
+				return ""
+			}
+			return id[1 : len(id)-1]
 		},
-		"getter": func(a *openfga.Access, me pgs.Method) string {
+		"getter": func(s *openfga.Step, me pgs.Method) string {
 			t := me.Input()
-			parts := strings.Split(a.ID[1:len(a.ID)-1], ".")
+			id := s.GetID()
+			parts := strings.Split(id[1:len(id)-1], ".")
 			var getter string
 			i := 0
 			for i < len(parts) {
@@ -133,8 +151,8 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			}
 			return getter
 		},
-		"object": func(a *openfga.Access) string {
-			return a.Type + ":" + a.ID
+		"object": func(s *openfga.Step) string {
+			return s.GetType() + ":" + s.GetID()
 		},
 		"upperCamelCase": func(s string) string {
 			return pgs.Name(s).UpperCamelCase().String()
@@ -154,6 +172,35 @@ func (m *Module) Name() string {
 }
 
 func (m *Module) module(s pgs.Service) *openfga.Module {
+	m.Push(s.Name().String())
+	defer m.Pop()
+	mod := m.moduleExt(s)
+	for _, v := range s.Methods() {
+		m.Push(v.Name().String())
+		a := m.accessExt(v)
+		for _, vv := range a.Check {
+			if vv == nil || vv.GetAs() == "" {
+				continue
+			}
+			if mod == nil {
+				m.Fail("\"as\" is not allowed without a module definition")
+			}
+			a = m.defaults(a, v)
+			t := find(mod, vv.GetType())
+			if t == nil {
+				m.Failf("type %q not found in module", vv.GetAs())
+			}
+			t.Relations = append(t.Relations, &openfga.Relation{
+				Define: define(mod, v, vv.GetType()),
+				As:     vv.GetAs(),
+			})
+		}
+		m.Pop()
+	}
+	return mod
+}
+
+func (m *Module) moduleExt(s pgs.Service) *openfga.Module {
 	var mod openfga.Module
 	ok, err := s.Extension(openfga.ExtModule, &mod)
 	if err != nil {
@@ -169,8 +216,65 @@ func (m *Module) module(s pgs.Service) *openfga.Module {
 }
 
 func (m *Module) access(me pgs.Method) *openfga.Access {
+	a := m.accessExt(me)
+	if a == nil {
+		return nil
+	}
+	mod := m.moduleExt(me.Service())
+	a = m.defaults(a, me)
+	for _, v := range a.Check {
+		if v.GetAs() == "" {
+			continue
+		}
+		if mod == nil {
+			m.Fail("\"as\" is not allowed without a module definition")
+		}
+		v.Relation = &openfga.Step_Check{Check: define(mod, me, v.GetType())}
+	}
+	return a
+}
+
+func (m *Module) accessExt(me pgs.Method) *openfga.Access {
 	var access openfga.Access
 	ok, err := me.Extension(openfga.ExtAccess, &access)
+	if err != nil {
+		m.Fail(err)
+	}
+	if !ok {
+		return nil
+	}
+	if err := access.ValidateAll(); err != nil {
+		m.Fail(err)
+	}
+	return &access
+}
+
+func (m *Module) defaults(a *openfga.Access, me pgs.Method) *openfga.Access {
+	var id, typ *string
+	var ignore *bool
+	if d := m.defaultAccess(me.Service()); d != nil {
+		id, typ, ignore = d.ID, d.Type, d.IgnoreNotFound
+	}
+	for _, v := range a.Check {
+		if v.ID == nil {
+			v.ID = id
+		}
+		if v.Type == nil {
+			v.Type = typ
+		}
+		if v.IgnoreNotFound == nil {
+			v.IgnoreNotFound = ignore
+		}
+		if v.ID == nil || v.Type == nil {
+			m.Failf("access %q is missing id or type", me.Name())
+		}
+	}
+	return a
+}
+
+func (m *Module) defaultAccess(s pgs.Service) *openfga.DefaultAccess {
+	var access openfga.DefaultAccess
+	ok, err := s.Extension(openfga.ExtDefaults, &access)
 	if err != nil {
 		m.Fail(err)
 	}
@@ -198,16 +302,9 @@ func (m *Module) generate(f pgs.File) {
 }
 
 func (m *Module) generateModule(f pgs.File, s pgs.Service) error {
-	var mod openfga.Module
-	ok, err := s.Extension(openfga.ExtModule, &mod)
-	if err != nil {
-		return fmt.Errorf("unable to read module extension: %w", err)
-	}
-	if !ok {
+	mod := m.module(s)
+	if mod == nil {
 		return nil
-	}
-	if err := mod.ValidateAll(); err != nil {
-		m.Failf("fga module is invalid: %v", err)
 	}
 	name := f.InputPath().SetExt(".fga")
 	m.AddGeneratorTemplateFile(name.String(), fgaTemplate, mod)
@@ -238,6 +335,38 @@ func (m *Module) generateRegister(f pgs.File) error {
 	}
 	name := m.ctx.OutputPath(f).SetExt(".fga.go")
 	m.AddGeneratorTemplateFile(name.String(), m.tpl, f)
+	return nil
+}
+
+func define(mod *openfga.Module, m pgs.Method, typ string, prefix ...string) string {
+	p := "can_"
+	if len(prefix) > 0 {
+		p = prefix[0] + "_"
+	}
+	method := m.Name().LowerSnakeCase().String()
+	var name string
+	if strings.Contains(method, "_"+typ) || strings.Contains(method, typ+"_") {
+		name = p + method
+	} else {
+		name = fmt.Sprintf("%s%s_%s", p, mod.Name, method)
+	}
+	if strings.Contains(name, "_"+typ) {
+		return strings.Replace(name, "_"+typ, "", 1)
+	}
+	return name
+}
+
+func find(mod *openfga.Module, name string) *openfga.Type {
+	for _, v := range mod.Definitions {
+		if v.Type == name {
+			return v
+		}
+	}
+	for _, v := range mod.Extends {
+		if v.Type == name {
+			return v
+		}
+	}
 	return nil
 }
 
