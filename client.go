@@ -19,14 +19,16 @@ import (
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	"google.golang.org/grpc"
+
+	"go.linka.cloud/go-openfga/x"
 )
 
 func NewClient(c grpc.ClientConnInterface) Client {
-	return &client{c: openfgav1.NewOpenFGAServiceClient(c)}
+	return &client{c: x.NewClient(c)}
 }
 
 type client struct {
-	c openfgav1.OpenFGAServiceClient
+	c x.Client
 }
 
 func (c *client) CreateStore(ctx context.Context, name string) (Store, error) {

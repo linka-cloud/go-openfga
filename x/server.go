@@ -28,18 +28,24 @@ import (
 	pbv1 "go.linka.cloud/go-openfga/x/pb/v1"
 )
 
-func Wrap[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (pbv1.OpenFGAXServiceServer, error) {
+type Server interface {
+	openfgav1.OpenFGAServiceServer
+	pbv1.OpenFGAXServiceServer
+	Close()
+}
+
+func Wrap[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (Server, error) {
 	opts = append(opts, server.WithDatastore(s))
 	srv, err := server.NewServerWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &svc[T]{c: srv, s: s}, nil
+	return &svc[T]{OpenFGAServiceServer: srv, s: s}, nil
 }
 
 type svc[T any] struct {
 	pbv1.UnsafeOpenFGAXServiceServer
-	c openfgav1.OpenFGAServiceServer
+	openfgav1.OpenFGAServiceServer
 	s storage.Datastore[T]
 }
 
@@ -73,7 +79,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 		var res *pbv1.TxResponse
 		switch r := req.Request.(type) {
 		case *pbv1.TxRequest_Read:
-			v, err := s.c.Read(ctx, r.Read)
+			v, err := s.OpenFGAServiceServer.Read(ctx, r.Read)
 			if err != nil {
 				return err
 			}
@@ -81,7 +87,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				Read: v,
 			}}
 		case *pbv1.TxRequest_Write:
-			v, err := s.c.Write(ctx, r.Write)
+			v, err := s.OpenFGAServiceServer.Write(ctx, r.Write)
 			if err != nil {
 				return err
 			}
@@ -89,7 +95,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				Write: v,
 			}}
 		case *pbv1.TxRequest_Check:
-			v, err := s.c.Check(ctx, r.Check)
+			v, err := s.OpenFGAServiceServer.Check(ctx, r.Check)
 			if err != nil {
 				return err
 			}
@@ -97,7 +103,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				Check: v,
 			}}
 		case *pbv1.TxRequest_BatchCheck:
-			v, err := s.c.BatchCheck(ctx, r.BatchCheck)
+			v, err := s.OpenFGAServiceServer.BatchCheck(ctx, r.BatchCheck)
 			if err != nil {
 				return err
 			}
@@ -105,7 +111,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				BatchCheck: v,
 			}}
 		case *pbv1.TxRequest_Expand:
-			v, err := s.c.Expand(ctx, r.Expand)
+			v, err := s.OpenFGAServiceServer.Expand(ctx, r.Expand)
 			if err != nil {
 				return err
 			}
@@ -113,7 +119,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				Expand: v,
 			}}
 		case *pbv1.TxRequest_ReadAuthorizationModels:
-			v, err := s.c.ReadAuthorizationModels(ctx, r.ReadAuthorizationModels)
+			v, err := s.OpenFGAServiceServer.ReadAuthorizationModels(ctx, r.ReadAuthorizationModels)
 			if err != nil {
 				return err
 			}
@@ -121,7 +127,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				ReadAuthorizationModels: v,
 			}}
 		case *pbv1.TxRequest_ReadAuthorizationModel:
-			v, err := s.c.ReadAuthorizationModel(ctx, r.ReadAuthorizationModel)
+			v, err := s.OpenFGAServiceServer.ReadAuthorizationModel(ctx, r.ReadAuthorizationModel)
 			if err != nil {
 				return err
 			}
@@ -129,7 +135,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				ReadAuthorizationModel: v,
 			}}
 		case *pbv1.TxRequest_WriteAuthorizationModel:
-			v, err := s.c.WriteAuthorizationModel(ctx, r.WriteAuthorizationModel)
+			v, err := s.OpenFGAServiceServer.WriteAuthorizationModel(ctx, r.WriteAuthorizationModel)
 			if err != nil {
 				return err
 			}
@@ -137,7 +143,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				WriteAuthorizationModel: v,
 			}}
 		case *pbv1.TxRequest_WriteAssertions:
-			v, err := s.c.WriteAssertions(ctx, r.WriteAssertions)
+			v, err := s.OpenFGAServiceServer.WriteAssertions(ctx, r.WriteAssertions)
 			if err != nil {
 				return err
 			}
@@ -145,7 +151,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				WriteAssertions: v,
 			}}
 		case *pbv1.TxRequest_ReadAssertions:
-			v, err := s.c.ReadAssertions(ctx, r.ReadAssertions)
+			v, err := s.OpenFGAServiceServer.ReadAssertions(ctx, r.ReadAssertions)
 			if err != nil {
 				return err
 			}
@@ -153,7 +159,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				ReadAssertions: v,
 			}}
 		case *pbv1.TxRequest_ReadChanges:
-			v, err := s.c.ReadChanges(ctx, r.ReadChanges)
+			v, err := s.OpenFGAServiceServer.ReadChanges(ctx, r.ReadChanges)
 			if err != nil {
 				return err
 			}
@@ -161,7 +167,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				ReadChanges: v,
 			}}
 		case *pbv1.TxRequest_CreateStore:
-			v, err := s.c.CreateStore(ctx, r.CreateStore)
+			v, err := s.OpenFGAServiceServer.CreateStore(ctx, r.CreateStore)
 			if err != nil {
 				return err
 			}
@@ -169,7 +175,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				CreateStore: v,
 			}}
 		case *pbv1.TxRequest_UpdateStore:
-			v, err := s.c.UpdateStore(ctx, r.UpdateStore)
+			v, err := s.OpenFGAServiceServer.UpdateStore(ctx, r.UpdateStore)
 			if err != nil {
 				return err
 			}
@@ -177,7 +183,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				UpdateStore: v,
 			}}
 		case *pbv1.TxRequest_DeleteStore:
-			v, err := s.c.DeleteStore(ctx, r.DeleteStore)
+			v, err := s.OpenFGAServiceServer.DeleteStore(ctx, r.DeleteStore)
 			if err != nil {
 				return err
 			}
@@ -185,7 +191,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				DeleteStore: v,
 			}}
 		case *pbv1.TxRequest_GetStore:
-			v, err := s.c.GetStore(ctx, r.GetStore)
+			v, err := s.OpenFGAServiceServer.GetStore(ctx, r.GetStore)
 			if err != nil {
 				return err
 			}
@@ -193,7 +199,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				GetStore: v,
 			}}
 		case *pbv1.TxRequest_ListStores:
-			v, err := s.c.ListStores(ctx, r.ListStores)
+			v, err := s.OpenFGAServiceServer.ListStores(ctx, r.ListStores)
 			if err != nil {
 				return err
 			}
@@ -201,7 +207,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				ListStores: v,
 			}}
 		case *pbv1.TxRequest_ListObjects:
-			v, err := s.c.ListObjects(ctx, r.ListObjects)
+			v, err := s.OpenFGAServiceServer.ListObjects(ctx, r.ListObjects)
 			if err != nil {
 				return err
 			}
@@ -209,7 +215,7 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 				ListObjects: v,
 			}}
 		case *pbv1.TxRequest_ListUsers:
-			v, err := s.c.ListUsers(ctx, r.ListUsers)
+			v, err := s.OpenFGAServiceServer.ListUsers(ctx, r.ListUsers)
 			if err != nil {
 				return err
 			}
@@ -228,4 +234,8 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 			return err
 		}
 	}
+}
+
+func (s *svc[T]) Close() {
+	s.s.Close()
 }

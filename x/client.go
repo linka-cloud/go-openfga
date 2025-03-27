@@ -28,15 +28,27 @@ import (
 
 var _ openfgav1.OpenFGAServiceClient = (*txc)(nil)
 
-func newClient(cc grpc.ClientConnInterface) *client {
-	return &client{c: pbv1.NewOpenFGAXServiceClient(cc)}
+type Tx interface {
+	openfgav1.OpenFGAServiceClient
+	Commit(ctx context.Context) error
+	Close() error
 }
 
-type client struct {
+type Client interface {
+	openfgav1.OpenFGAServiceClient
+	Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error)
+}
+
+func NewClient(cc grpc.ClientConnInterface) Client {
+	return &xclient{c: pbv1.NewOpenFGAXServiceClient(cc), OpenFGAServiceClient: openfgav1.NewOpenFGAServiceClient(cc)}
+}
+
+type xclient struct {
+	openfgav1.OpenFGAServiceClient
 	c pbv1.OpenFGAXServiceClient
 }
 
-func (c *client) Tx(ctx context.Context, opts ...storage.TxOption) (*txc, error) {
+func (c *xclient) Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error) {
 	var o storage.TxOptions
 	for _, v := range opts {
 		v(&o)
@@ -341,6 +353,6 @@ func (t *txc) Commit(ctx context.Context) error {
 	return nil
 }
 
-func (t *txc) Close() {
-	t.t.CloseSend()
+func (t *txc) Close() error {
+	return t.t.CloseSend()
 }

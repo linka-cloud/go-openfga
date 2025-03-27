@@ -52,7 +52,7 @@ func (s *store) AuthorizationModel(ctx context.Context, id string) (Model, error
 	if err != nil {
 		return nil, err
 	}
-	return &model{m: res.AuthorizationModel, s: s}, nil
+	return s.model(res.AuthorizationModel), nil
 }
 
 func (s *store) ListAuthorizationModels(ctx context.Context) ([]Model, error) {
@@ -62,7 +62,7 @@ func (s *store) ListAuthorizationModels(ctx context.Context) ([]Model, error) {
 	}
 	var models []Model
 	for _, m := range res.AuthorizationModels {
-		models = append(models, &model{m: m, s: s})
+		models = append(models, s.model(m))
 	}
 	return models, nil
 }
@@ -75,7 +75,7 @@ func (s *store) LastAuthorizationModel(ctx context.Context) (Model, error) {
 	if len(res.AuthorizationModels) == 0 {
 		return nil, errors.New("not found")
 	}
-	return &model{m: res.AuthorizationModels[len(res.AuthorizationModels)-1], s: s}, nil
+	return s.model(res.AuthorizationModels[len(res.AuthorizationModels)-1]), nil
 }
 
 func (s *store) WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model, error) {
@@ -93,4 +93,8 @@ func (s *store) WriteAuthorizationModel(ctx context.Context, dsl ...string) (Mod
 		return nil, fmt.Errorf("failed to write authorization model: %w", err)
 	}
 	return s.AuthorizationModel(ctx, res.AuthorizationModelId)
+}
+
+func (s *store) model(m *openfgav1.AuthorizationModel) *model {
+	return &model{s: s, rw: &rw{c: s.c.c, m: m, sid: s.id, mid: m.Id}, c: s.c.c}
 }

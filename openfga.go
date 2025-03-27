@@ -13,11 +13,15 @@ import (
 	"github.com/openfga/openfga/pkg/middleware/validator"
 	"github.com/openfga/openfga/pkg/server"
 	"google.golang.org/grpc"
+
+	"go.linka.cloud/go-openfga/storage"
+	"go.linka.cloud/go-openfga/x"
+	pbv1 "go.linka.cloud/go-openfga/x/pb/v1"
 )
 
 type FGA interface {
 	Client
-	Service() *server.Server
+	Service() x.Server
 	Close()
 }
 
@@ -40,50 +44,56 @@ type Store interface {
 	UpdatedAt() time.Time
 }
 
-type Model interface {
-	ID() string
-	Store() Store
-	Show() (string, error)
-
+type TupleReader interface {
 	Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error)
 	ReadWithPaging(ctx context.Context, object, relation, user string, pageSize int32, continuationToken string) ([]*openfgav1.Tuple, string, error)
 	Expand(ctx context.Context, object, relation string) (*openfgav1.UsersetTree, error)
 	ListObjects(ctx context.Context, typ, relation, user string) ([]string, error)
 	ListUsers(ctx context.Context, object, relation, userTyp string, contextKVs ...any) ([]string, error)
 	ListRelations(ctx context.Context, object, user string, relations ...string) ([]string, error)
-	Tx() Tx
+
 	Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error)
 	CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs ...any) (bool, error)
+}
+
+type TupleWriter interface {
 	Write(ctx context.Context, object, relation, user string) error
 	WriteWithCondition(ctx context.Context, object, relation, user string, condition string, kv ...any) error
 	WriteTuples(context.Context, ...*openfgav1.TupleKey) error
 	Delete(ctx context.Context, object, relation, user string) error
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
+}
 
-	Reload(ctx context.Context) error
+type Model interface {
+	TupleReader
+	TupleWriter
+
+	ID() string
+	Store() Store
+	Show() (string, error)
+	// Reload(ctx context.Context) error
+
+	Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error)
 }
 
 type Tx interface {
-	Write(object, relation, user string) error
-	WriteTuples(...*openfgav1.TupleKey) error
-	WriteWithCondition(object, relation, user string, condition string, kv ...any) error
-	Delete(object, relation, user string) error
-	DeleteTuples(...*openfgav1.TupleKey) error
+	TupleReader
+	TupleWriter
 	Commit(ctx context.Context) error
-	Close()
+	Close() error
 }
 
 type fga struct {
 	Client
-	s *server.Server
+	s x.Server
 }
 
-func FomClient(c openfgav1.OpenFGAServiceClient) Client {
+func FomClient(c x.Client) Client {
 	return &client{c: c}
 }
 
-func New(opts ...server.OpenFGAServiceV1Option) (FGA, error) {
-	s, err := server.NewServerWithOpts(opts...)
+func New[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (FGA, error) {
+	svc, err := x.Wrap(s, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,11 +116,12 @@ func New(opts ...server.OpenFGAServiceV1Option) (FGA, error) {
 			}...,
 		),
 	)
-	openfgav1.RegisterOpenFGAServiceServer(ch, s)
-	return &fga{s: s, Client: &client{c: openfgav1.NewOpenFGAServiceClient(ch)}}, nil
+	openfgav1.RegisterOpenFGAServiceServer(ch, svc)
+	pbv1.RegisterOpenFGAXServiceServer(ch, svc)
+	return &fga{s: svc, Client: &client{c: x.NewClient(ch)}}, nil
 }
 
-func (f *fga) Service() *server.Server {
+func (f *fga) Service() x.Server {
 	return f.s
 }
 

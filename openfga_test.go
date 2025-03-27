@@ -5,7 +5,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/openfga/openfga/pkg/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	protodb2 "go.linka.cloud/protodb"
@@ -22,7 +21,7 @@ func TestServer(t *testing.T) {
 	db, err := protodb.New(ctx, protodb2.WithInMemory(true))
 	require.NoError(t, err)
 	defer db.Close()
-	f, err := openfga.New(server.WithDatastore(db))
+	f, err := openfga.New(db)
 	require.NoError(t, err)
 	defer f.Close()
 
@@ -78,4 +77,16 @@ func TestServer(t *testing.T) {
 	slices.Sort(rs)
 	assert.Equal(t, []string{"can_change_owner", "can_read", "can_share", "can_write", "owner"}, rs)
 	assert.Len(t, us, 1)
+
+	tx, err := m.Tx(ctx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Write(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.Owner, tests.User.Ref("user3")))
+	ok, err = tx.Check(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.Owner, tests.User.Ref("user3"))
+	require.NoError(t, err)
+	assert.True(t, ok)
+	require.NoError(t, tx.Close())
+
+	ok, err = m.Check(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.Owner, tests.User.Ref("user3"))
+	require.NoError(t, err)
+	assert.False(t, ok)
 }
