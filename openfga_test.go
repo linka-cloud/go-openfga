@@ -90,3 +90,33 @@ func TestServer(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
+
+func TestWithTx(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := protodb2.Open(ctx, protodb2.WithInMemory(true))
+	require.NoError(t, err)
+	defer db.Close()
+	fdb, err := protodb.NewWithClient(ctx, db)
+	require.NoError(t, err)
+	defer db.Close()
+	f, err := openfga.New(fdb)
+	require.NoError(t, err)
+	defer f.Close()
+
+	s, err := f.CreateStore(ctx, "default")
+	require.NoError(t, err)
+	m, err := s.WriteAuthorizationModel(ctx, tests.DSL)
+	require.NoError(t, err)
+	txn, err := db.Tx(ctx)
+	require.NoError(t, err)
+	defer txn.Close()
+	tx := m.WithTx(txn)
+	require.NoError(t, tx.Write(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.Owner, tests.User.Ref("user1")))
+	require.NoError(t, txn.Commit(ctx))
+	require.Error(t, tx.Commit(ctx))
+	ts, err := m.Read(ctx, "", "", "")
+	require.NoError(t, err)
+	require.Len(t, ts, 1)
+}

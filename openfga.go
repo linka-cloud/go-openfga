@@ -4,39 +4,27 @@ import (
 	"context"
 	"time"
 
-	"github.com/fullstorydev/grpchan/inprocgrpc"
-	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
-	"github.com/openfga/openfga/pkg/middleware/requestid"
-	"github.com/openfga/openfga/pkg/middleware/storeid"
-	"github.com/openfga/openfga/pkg/middleware/validator"
 	"github.com/openfga/openfga/pkg/server"
-	"google.golang.org/grpc"
 
 	"go.linka.cloud/go-openfga/storage"
 	"go.linka.cloud/go-openfga/x"
-	pbv1 "go.linka.cloud/go-openfga/x/pb/v1"
+	"go.linka.cloud/go-openfga/x/service"
 )
 
-type FGA interface {
-	Client
-	Service() x.Server
+type FGA[T any] interface {
+	CreateStore(ctx context.Context, name string) (Store[T], error)
+	DeleteStore(ctx context.Context, name string) error
+	GetStore(ctx context.Context, name string) (Store[T], error)
+	ListStores(ctx context.Context) ([]Store[T], error)
 	Close()
 }
 
-type Client interface {
-	CreateStore(ctx context.Context, name string) (Store, error)
-	DeleteStore(ctx context.Context, name string) error
-	GetStore(ctx context.Context, name string) (Store, error)
-	ListStores(ctx context.Context) ([]Store, error)
-}
-
-type Store interface {
-	AuthorizationModel(ctx context.Context, id string) (Model, error)
-	LastAuthorizationModel(ctx context.Context) (Model, error)
-	ListAuthorizationModels(ctx context.Context) ([]Model, error)
-	WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model, error)
+type Store[T any] interface {
+	AuthorizationModel(ctx context.Context, id string) (Model[T], error)
+	LastAuthorizationModel(ctx context.Context) (Model[T], error)
+	ListAuthorizationModels(ctx context.Context) ([]Model[T], error)
+	WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model[T], error)
 
 	ID() string
 	Name() string
@@ -64,16 +52,17 @@ type TupleWriter interface {
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
 }
 
-type Model interface {
+type Model[T any] interface {
 	TupleReader
 	TupleWriter
 
 	ID() string
-	Store() Store
+	Store() Store[T]
 	Show() (string, error)
 	// Reload(ctx context.Context) error
 
 	Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error)
+	WithTx(tx T) Tx
 }
 
 type Tx interface {
@@ -83,48 +72,23 @@ type Tx interface {
 	Close() error
 }
 
-type fga struct {
-	Client
-	s x.Server
+type fga[T any] struct {
+	FGA[T]
+	s x.OpenFGA[T]
 }
 
-func FomClient(c x.Client) Client {
-	return &client{c: c}
+func FomClient(c service.Client) FGA[none] {
+	return &client[none]{c: wrap(c)}
 }
 
-func New[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (FGA, error) {
-	svc, err := x.Wrap(s, opts...)
+func New[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (FGA[T], error) {
+	srv, err := x.New(s, opts...)
 	if err != nil {
 		return nil, err
 	}
-	ch := &inprocgrpc.Channel{}
-	ch.WithServerUnaryInterceptor(
-		grpcmiddleware.ChainUnaryServer(
-			grpc_ctxtags.UnaryServerInterceptor(), // needed for logging
-			requestid.NewUnaryInterceptor(),       // add request_id to ctxtags
-			storeid.NewUnaryInterceptor(),         // if available, add store_id to ctxtags
-			// logging.NewLoggingInterceptor(s.Logger), // needed to log invalid requests
-			validator.UnaryServerInterceptor(),
-		),
-	)
-	ch.WithServerStreamInterceptor(
-		grpcmiddleware.ChainStreamServer(
-			[]grpc.StreamServerInterceptor{
-				requestid.NewStreamingInterceptor(),
-				validator.StreamServerInterceptor(),
-				grpc_ctxtags.StreamServerInterceptor(),
-			}...,
-		),
-	)
-	openfgav1.RegisterOpenFGAServiceServer(ch, svc)
-	pbv1.RegisterOpenFGAXServiceServer(ch, svc)
-	return &fga{s: svc, Client: &client{c: x.NewClient(ch)}}, nil
+	return &fga[T]{s: srv, FGA: &client[T]{c: srv}}, nil
 }
 
-func (f *fga) Service() x.Server {
-	return f.s
-}
-
-func (f *fga) Close() {
+func (f *fga[T]) Close() {
 	f.s.Close()
 }

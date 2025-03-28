@@ -202,6 +202,10 @@ func (p *pdb) Tx(ctx context.Context, opts ...xstorage.TxOption) (xstorage.Tx[pr
 	return &tx{tx: txn}, nil
 }
 
+func (p *pdb) WithTx(txn protodb.Tx) xstorage.Tx[protodb.Tx] {
+	return &tx{tx: txn}
+}
+
 func (p *pdb) IsReady(ctx context.Context) (storage.ReadinessStatus, error) {
 	return storage.ReadinessStatus{IsReady: true}, nil
 }
@@ -299,7 +303,6 @@ func (t *tx) ReadUsersetTuples(ctx context.Context, store string, filter storage
 func (t *tx) ReadStartingWithUser(ctx context.Context, store string, filter storage.ReadStartingWithUserFilter, _ storage.ReadStartingWithUserOptions) (storage.TupleIterator, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	// TODO(adphi): handle filter.ObjectIDs
 	var of []filters.Builder
 	if filter.ObjectIDs != nil {
 		for _, v := range filter.ObjectIDs.Values() {

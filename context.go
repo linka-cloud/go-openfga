@@ -20,17 +20,17 @@ import (
 
 type key struct{}
 
-func Context(ctx context.Context, model Model) context.Context {
+func Context[T any](ctx context.Context, model Model[T]) context.Context {
 	return context.WithValue(ctx, key{}, model)
 }
 
-func FromContext(ctx context.Context) (Model, bool) {
-	v, ok := ctx.Value(key{}).(Model)
+func FromContext[T any](ctx context.Context) (Model[T], bool) {
+	v, ok := ctx.Value(key{}).(Model[T])
 	return v, ok
 }
 
-func MustFromContext(ctx context.Context) Model {
-	v, ok := FromContext(ctx)
+func MustFromContext[T any](ctx context.Context) Model[T] {
+	v, ok := FromContext[T](ctx)
 	if !ok {
 		panic("no openfga model in context")
 	}

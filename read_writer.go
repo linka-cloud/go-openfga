@@ -27,7 +27,7 @@ import (
 )
 
 type rw struct {
-	c   openfgav1.OpenFGAServiceClient
+	c   openfgav1.OpenFGAServiceServer
 	m   *openfgav1.AuthorizationModel
 	mid string
 	sid string
@@ -56,17 +56,25 @@ func (m *rw) CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs
 }
 
 func (m *rw) Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error) {
+	var key *openfgav1.ReadRequestTupleKey
+	if object != "" || user != "" || relation != "" {
+		key = &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object}
+	}
 	res, err := m.c.Read(ctx, &openfgav1.ReadRequest{
 		StoreId:  m.sid,
-		TupleKey: &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
+		TupleKey: key,
 	})
 	return res.GetTuples(), err
 }
 
 func (m *rw) ReadWithPaging(ctx context.Context, object, relation, user string, pageSize int32, continuationToken string) ([]*openfgav1.Tuple, string, error) {
+	var key *openfgav1.ReadRequestTupleKey
+	if object != "" || user != "" || relation != "" {
+		key = &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object}
+	}
 	res, err := m.c.Read(ctx, &openfgav1.ReadRequest{
 		StoreId:           m.sid,
-		TupleKey:          &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
+		TupleKey:          key,
 		PageSize:          wrapperspb.Int32(pageSize),
 		ContinuationToken: continuationToken,
 	})

@@ -21,45 +21,48 @@ import (
 	"google.golang.org/grpc"
 
 	"go.linka.cloud/go-openfga/x"
+	"go.linka.cloud/go-openfga/x/service"
 )
 
-func NewClient(c grpc.ClientConnInterface) Client {
-	return &client{c: x.NewClient(c)}
+func NewClient(cc grpc.ClientConnInterface) FGA[none] {
+	return &client[none]{c: wrap(service.NewClient(cc))}
 }
 
-type client struct {
-	c x.Client
+type client[T any] struct {
+	c x.OpenFGA[T]
 }
 
-func (c *client) CreateStore(ctx context.Context, name string) (Store, error) {
+func (c *client[T]) CreateStore(ctx context.Context, name string) (Store[T], error) {
 	res, err := c.c.CreateStore(ctx, &openfgav1.CreateStoreRequest{Name: name})
 	if err != nil {
 		return nil, err
 	}
-	return &store{c: c, id: res.Id, name: res.Name, createdAt: res.CreatedAt.AsTime(), updatedAt: res.UpdatedAt.AsTime()}, nil
+	return &store[T]{c: c, id: res.Id, name: res.Name, createdAt: res.CreatedAt.AsTime(), updatedAt: res.UpdatedAt.AsTime()}, nil
 }
 
-func (c *client) GetStore(ctx context.Context, id string) (Store, error) {
+func (c *client[T]) GetStore(ctx context.Context, id string) (Store[T], error) {
 	res, err := c.c.GetStore(ctx, &openfgav1.GetStoreRequest{StoreId: id})
 	if err != nil {
 		return nil, err
 	}
-	return &store{c: c, id: res.Id, name: res.Name, createdAt: res.CreatedAt.AsTime(), updatedAt: res.UpdatedAt.AsTime()}, nil
+	return &store[T]{c: c, id: res.Id, name: res.Name, createdAt: res.CreatedAt.AsTime(), updatedAt: res.UpdatedAt.AsTime()}, nil
 }
 
-func (c *client) ListStores(ctx context.Context) ([]Store, error) {
+func (c *client[T]) ListStores(ctx context.Context) ([]Store[T], error) {
 	res, err := c.c.ListStores(ctx, &openfgav1.ListStoresRequest{})
 	if err != nil {
 		return nil, err
 	}
-	var stores []Store
+	var stores []Store[T]
 	for _, s := range res.Stores {
-		stores = append(stores, &store{c: c, id: s.Id, name: s.Name, createdAt: s.CreatedAt.AsTime(), updatedAt: s.UpdatedAt.AsTime()})
+		stores = append(stores, &store[T]{c: c, id: s.Id, name: s.Name, createdAt: s.CreatedAt.AsTime(), updatedAt: s.UpdatedAt.AsTime()})
 	}
 	return stores, nil
 }
 
-func (c *client) DeleteStore(ctx context.Context, id string) error {
+func (c *client[T]) DeleteStore(ctx context.Context, id string) error {
 	_, err := c.c.DeleteStore(ctx, &openfgav1.DeleteStoreRequest{StoreId: id})
 	return err
 }
+
+func (c *client[T]) Close() {}

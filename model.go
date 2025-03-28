@@ -29,9 +29,9 @@ import (
 
 const SchemaVersion = "1.2"
 
-type model struct {
-	s *store
-	c x.Client
+type model[T any] struct {
+	s *store[T]
+	c x.OpenFGA[T]
 	*rw
 }
 
@@ -47,7 +47,7 @@ type model struct {
 // 	return nil
 // }
 
-func (m *model) Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error) {
+func (m *model[T]) Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error) {
 	c, err := m.c.Tx(ctx, opts...)
 	if err != nil {
 		return nil, err
@@ -55,15 +55,20 @@ func (m *model) Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error) {
 	return &tx{c: c, rw: &rw{c: c, m: m.m, mid: m.mid, sid: m.sid}}, nil
 }
 
-func (m *model) ID() string {
+func (m *model[T]) WithTx(t T) Tx {
+	c := m.c.WithTx(t)
+	return &tx{c: c, rw: &rw{c: c, m: m.m, mid: m.mid, sid: m.sid}}
+}
+
+func (m *model[T]) ID() string {
 	return m.m.Id
 }
 
-func (m *model) Store() Store {
+func (m *model[T]) Store() Store[T] {
 	return m.s
 }
 
-func (m *model) Show() (string, error) {
+func (m *model[T]) Show() (string, error) {
 	return parser.TransformJSONProtoToDSL(m.m, parser.WithIncludeSourceInformation(true))
 }
 

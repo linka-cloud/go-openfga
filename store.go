@@ -23,31 +23,31 @@ import (
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 )
 
-type store struct {
+type store[T any] struct {
 	id        string
 	name      string
 	createdAt time.Time
 	updatedAt time.Time
-	c         *client
+	c         *client[T]
 }
 
-func (s *store) ID() string {
+func (s *store[T]) ID() string {
 	return s.id
 }
 
-func (s *store) Name() string {
+func (s *store[T]) Name() string {
 	return s.name
 }
 
-func (s *store) CreatedAt() time.Time {
+func (s *store[T]) CreatedAt() time.Time {
 	return s.createdAt
 }
 
-func (s *store) UpdatedAt() time.Time {
+func (s *store[T]) UpdatedAt() time.Time {
 	return s.updatedAt
 }
 
-func (s *store) AuthorizationModel(ctx context.Context, id string) (Model, error) {
+func (s *store[T]) AuthorizationModel(ctx context.Context, id string) (Model[T], error) {
 	res, err := s.c.c.ReadAuthorizationModel(ctx, &openfgav1.ReadAuthorizationModelRequest{StoreId: s.id, Id: id})
 	if err != nil {
 		return nil, err
@@ -55,19 +55,19 @@ func (s *store) AuthorizationModel(ctx context.Context, id string) (Model, error
 	return s.model(res.AuthorizationModel), nil
 }
 
-func (s *store) ListAuthorizationModels(ctx context.Context) ([]Model, error) {
+func (s *store[T]) ListAuthorizationModels(ctx context.Context) ([]Model[T], error) {
 	res, err := s.c.c.ReadAuthorizationModels(ctx, &openfgav1.ReadAuthorizationModelsRequest{StoreId: s.id})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list authorization models: %w", err)
 	}
-	var models []Model
+	var models []Model[T]
 	for _, m := range res.AuthorizationModels {
 		models = append(models, s.model(m))
 	}
 	return models, nil
 }
 
-func (s *store) LastAuthorizationModel(ctx context.Context) (Model, error) {
+func (s *store[T]) LastAuthorizationModel(ctx context.Context) (Model[T], error) {
 	res, err := s.c.c.ReadAuthorizationModels(ctx, &openfgav1.ReadAuthorizationModelsRequest{StoreId: s.id})
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (s *store) LastAuthorizationModel(ctx context.Context) (Model, error) {
 	return s.model(res.AuthorizationModels[len(res.AuthorizationModels)-1]), nil
 }
 
-func (s *store) WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model, error) {
+func (s *store[T]) WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model[T], error) {
 	m, err := combineModules(dsl...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse model: %w", err)
@@ -95,6 +95,6 @@ func (s *store) WriteAuthorizationModel(ctx context.Context, dsl ...string) (Mod
 	return s.AuthorizationModel(ctx, res.AuthorizationModelId)
 }
 
-func (s *store) model(m *openfgav1.AuthorizationModel) *model {
-	return &model{s: s, rw: &rw{c: s.c.c, m: m, sid: s.id, mid: m.Id}, c: s.c.c}
+func (s *store[T]) model(m *openfgav1.AuthorizationModel) *model[T] {
+	return &model[T]{s: s, rw: &rw{c: s.c.c, m: m, sid: s.id, mid: m.Id}, c: s.c.c}
 }

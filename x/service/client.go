@@ -1,4 +1,4 @@
-// Copyright 2024 Linka Cloud  All rights reserved.
+// Copyright 2025 Linka Cloud  All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package x
+package service
 
 import (
 	"context"
@@ -40,15 +40,15 @@ type Client interface {
 }
 
 func NewClient(cc grpc.ClientConnInterface) Client {
-	return &xclient{c: pbv1.NewOpenFGAXServiceClient(cc), OpenFGAServiceClient: openfgav1.NewOpenFGAServiceClient(cc)}
+	return &client{c: pbv1.NewOpenFGAXServiceClient(cc), OpenFGAServiceClient: openfgav1.NewOpenFGAServiceClient(cc)}
 }
 
-type xclient struct {
+type client struct {
 	openfgav1.OpenFGAServiceClient
 	c pbv1.OpenFGAXServiceClient
 }
 
-func (c *xclient) Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error) {
+func (c *client) Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error) {
 	var o storage.TxOptions
 	for _, v := range opts {
 		v(&o)

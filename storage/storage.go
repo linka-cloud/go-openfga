@@ -44,6 +44,7 @@ type Tx[T any] interface {
 
 type TxProvider[T any] interface {
 	Tx(ctx context.Context, opts ...TxOption) (Tx[T], error)
+	WithTx(tx T) Tx[T]
 }
 
 type Datastore[T any] interface {
