@@ -65,9 +65,13 @@ func (m *model) CheckTuple(ctx context.Context, key *openfgav1.TupleKey, context
 func (m *model) Read(ctx context.Context, object, relation, user string) ([]*openfgav1.Tuple, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	var key *openfgav1.ReadRequestTupleKey
+	if object != "" || user != "" || relation != "" {
+		key = &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object}
+	}
 	res, err := m.s.c.c.Read(ctx, &openfgav1.ReadRequest{
 		StoreId:  m.s.id,
-		TupleKey: &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
+		TupleKey: key,
 	})
 	return res.GetTuples(), err
 }
@@ -75,9 +79,13 @@ func (m *model) Read(ctx context.Context, object, relation, user string) ([]*ope
 func (m *model) ReadWithPaging(ctx context.Context, object, relation, user string, pageSize int32, continuationToken string) ([]*openfgav1.Tuple, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	var key *openfgav1.ReadRequestTupleKey
+	if object != "" || user != "" || relation != "" {
+		key = &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object}
+	}
 	res, err := m.s.c.c.Read(ctx, &openfgav1.ReadRequest{
 		StoreId:           m.s.id,
-		TupleKey:          &openfgav1.ReadRequestTupleKey{User: user, Relation: relation, Object: object},
+		TupleKey:          key,
 		PageSize:          wrapperspb.Int32(pageSize),
 		ContinuationToken: continuationToken,
 	})
