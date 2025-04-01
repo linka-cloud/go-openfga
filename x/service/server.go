@@ -34,24 +34,24 @@ type Server interface {
 	Close()
 }
 
-func Wrap[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (Server, error) {
+func Wrap(s storage.Datastore, opts ...server.OpenFGAServiceV1Option) (Server, error) {
 	opts = append(opts, server.WithDatastore(s))
 	srv, err := server.NewServerWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &svc[T]{OpenFGAServiceServer: srv, s: s}, nil
+	return &svc{OpenFGAServiceServer: srv, s: s}, nil
 }
 
-type svc[T any] struct {
+type svc struct {
 	pbv1.UnsafeOpenFGAXServiceServer
 	openfgav1.OpenFGAServiceServer
-	s storage.Datastore[T]
+	s storage.Datastore
 }
 
-func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse]) error {
+func (s *svc) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse]) error {
 	ctx := g.Context()
-	var tx storage.Tx[T]
+	var tx storage.Tx
 	defer func() {
 		if tx != nil {
 			tx.Close()
@@ -236,6 +236,6 @@ func (s *svc[T]) Tx(g grpc.BidiStreamingServer[pbv1.TxRequest, pbv1.TxResponse])
 	}
 }
 
-func (s *svc[T]) Close() {
+func (s *svc) Close() {
 	s.s.Close()
 }

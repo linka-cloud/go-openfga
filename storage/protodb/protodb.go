@@ -43,7 +43,7 @@ const (
 
 var _ storage.OpenFGADatastore = (*pdb)(nil)
 
-func New(ctx context.Context, option ...protodb.Option) (xstorage.Datastore[protodb.Tx], error) {
+func New(ctx context.Context, option ...protodb.Option) (xstorage.Datastore, error) {
 	db, err := protodb.Open(ctx, option...)
 	if err != nil {
 		return nil, err
@@ -52,11 +52,11 @@ func New(ctx context.Context, option ...protodb.Option) (xstorage.Datastore[prot
 
 }
 
-func NewWithClient(ctx context.Context, db protodb.Client) (xstorage.Datastore[protodb.Tx], error) {
+func NewWithClient(ctx context.Context, db protodb.Client) (xstorage.Datastore, error) {
 	return newWithClient(ctx, db, true)
 }
 
-func newWithClient(ctx context.Context, db protodb.Client, external bool) (xstorage.Datastore[protodb.Tx], error) {
+func newWithClient(ctx context.Context, db protodb.Client, external bool) (xstorage.Datastore, error) {
 	for _, v := range []proto.Message{&openfgav1.Store{}, &pbv1.Tuple{}, &pbv1.Assertions{}, &pbv1.Change{}} {
 		if err := db.Register(ctx, v.ProtoReflect().Descriptor().ParentFile()); err != nil {
 			return nil, err
@@ -186,7 +186,7 @@ func (p *pdb) Close() {
 	}
 }
 
-func (p *pdb) Tx(ctx context.Context, opts ...xstorage.TxOption) (xstorage.Tx[protodb.Tx], error) {
+func (p *pdb) Tx(ctx context.Context, opts ...xstorage.TxOption) (xstorage.Tx, error) {
 	var o xstorage.TxOptions
 	for _, v := range opts {
 		v(&o)
@@ -202,8 +202,12 @@ func (p *pdb) Tx(ctx context.Context, opts ...xstorage.TxOption) (xstorage.Tx[pr
 	return &tx{tx: txn}, nil
 }
 
-func (p *pdb) WithTx(txn protodb.Tx) xstorage.Tx[protodb.Tx] {
-	return &tx{tx: txn}
+func (p *pdb) WithTx(txn any) xstorage.Tx {
+	t, ok := txn.(protodb.Tx)
+	if !ok {
+		panic(fmt.Sprintf("invalid transaction type %T", txn))
+	}
+	return &tx{tx: t}
 }
 
 func (p *pdb) IsReady(ctx context.Context) (storage.ReadinessStatus, error) {
@@ -215,7 +219,7 @@ type tx struct {
 	tx protodb.Tx
 }
 
-func (t *tx) Unwrap() protodb.Tx {
+func (t *tx) Unwrap() any {
 	return t.tx
 }
 

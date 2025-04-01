@@ -32,33 +32,33 @@ func WithReadOnly() TxOption {
 	}
 }
 
-type Tx[T any] interface {
+type Tx interface {
 	storage.TupleBackend
 	storage.AuthorizationModelBackend
 	storage.StoresBackend
 	storage.AssertionsBackend
 	Commit(ctx context.Context) error
 	Close()
-	Unwrap() T
+	Unwrap() any
 }
 
-type TxProvider[T any] interface {
-	Tx(ctx context.Context, opts ...TxOption) (Tx[T], error)
-	WithTx(tx T) Tx[T]
+type TxProvider interface {
+	Tx(ctx context.Context, opts ...TxOption) (Tx, error)
+	WithTx(tx any) Tx
 }
 
-type Datastore[T any] interface {
+type Datastore interface {
 	storage.OpenFGADatastore
-	TxProvider[T]
+	TxProvider
 }
 
 type txKey struct{}
 
-func Context[T any](ctx context.Context, tx Tx[T]) context.Context {
+func Context(ctx context.Context, tx Tx) context.Context {
 	return context.WithValue(ctx, txKey{}, tx.Unwrap())
 }
 
-func From[T any](ctx context.Context) (T, bool) {
-	tx, ok := ctx.Value(txKey{}).(T)
-	return tx, ok
+func From(ctx context.Context) (any, bool) {
+	tx := ctx.Value(txKey{})
+	return tx, tx != nil
 }

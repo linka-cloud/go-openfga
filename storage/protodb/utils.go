@@ -16,6 +16,7 @@ package protodb
 
 import (
 	"context"
+	"fmt"
 
 	"go.linka.cloud/protodb"
 
@@ -23,21 +24,26 @@ import (
 )
 
 func maybeTx(ctx context.Context, p *pdb, opts ...protodb.TxOption) (protodb.Tx, error) {
-	if tx, ok := storage.From[protodb.Tx](ctx); ok {
-		return tx, nil
+	tx, ok := storage.From(ctx)
+	if !ok {
+		return p.db.Tx(ctx, opts...)
 	}
-	return p.db.Tx(ctx, opts...)
+	txn, ok := tx.(protodb.Tx)
+	if !ok {
+		panic(fmt.Sprintf("unexpected type %T", tx))
+	}
+	return txn, nil
 }
 
 func maybeCommit(ctx context.Context, tx protodb.Tx) error {
-	if _, ok := storage.From[protodb.Tx](ctx); ok {
+	if _, ok := storage.From(ctx); ok {
 		return nil
 	}
 	return tx.Commit(ctx)
 }
 
 func maybeClose(ctx context.Context, tx protodb.Tx) func() {
-	if _, ok := storage.From[protodb.Tx](ctx); ok {
+	if _, ok := storage.From(ctx); ok {
 		return func() {}
 	}
 	return tx.Close

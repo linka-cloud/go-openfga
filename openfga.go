@@ -12,19 +12,19 @@ import (
 	"go.linka.cloud/go-openfga/x/service"
 )
 
-type FGA[T any] interface {
-	CreateStore(ctx context.Context, name string) (Store[T], error)
+type FGA interface {
+	CreateStore(ctx context.Context, name string) (Store, error)
 	DeleteStore(ctx context.Context, name string) error
-	GetStore(ctx context.Context, name string) (Store[T], error)
-	ListStores(ctx context.Context) ([]Store[T], error)
+	GetStore(ctx context.Context, name string) (Store, error)
+	ListStores(ctx context.Context) ([]Store, error)
 	Close()
 }
 
-type Store[T any] interface {
-	AuthorizationModel(ctx context.Context, id string) (Model[T], error)
-	LastAuthorizationModel(ctx context.Context) (Model[T], error)
-	ListAuthorizationModels(ctx context.Context) ([]Model[T], error)
-	WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model[T], error)
+type Store interface {
+	AuthorizationModel(ctx context.Context, id string) (Model, error)
+	LastAuthorizationModel(ctx context.Context) (Model, error)
+	ListAuthorizationModels(ctx context.Context) ([]Model, error)
+	WriteAuthorizationModel(ctx context.Context, dsl ...string) (Model, error)
 
 	ID() string
 	Name() string
@@ -52,17 +52,17 @@ type TupleWriter interface {
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
 }
 
-type Model[T any] interface {
+type Model interface {
 	TupleReader
 	TupleWriter
 
 	ID() string
-	Store() Store[T]
+	Store() Store
 	Show() (string, error)
 	// Reload(ctx context.Context) error
 
 	Tx(ctx context.Context, opts ...storage.TxOption) (Tx, error)
-	WithTx(tx T) Tx
+	WithTx(tx any) Tx
 }
 
 type Tx interface {
@@ -72,23 +72,23 @@ type Tx interface {
 	Close() error
 }
 
-type fga[T any] struct {
-	FGA[T]
-	s x.OpenFGA[T]
+type fga struct {
+	FGA
+	s x.OpenFGA
 }
 
-func FomClient(c service.Client) FGA[none] {
-	return &client[none]{c: wrap(c)}
+func FomClient(c service.Client) FGA {
+	return &client{c: wrap(c)}
 }
 
-func New[T any](s storage.Datastore[T], opts ...server.OpenFGAServiceV1Option) (FGA[T], error) {
+func New(s storage.Datastore, opts ...server.OpenFGAServiceV1Option) (FGA, error) {
 	srv, err := x.New(s, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &fga[T]{s: srv, FGA: &client[T]{c: srv}}, nil
+	return &fga{s: srv, FGA: &client{c: srv}}, nil
 }
 
-func (f *fga[T]) Close() {
+func (f *fga) Close() {
 	f.s.Close()
 }

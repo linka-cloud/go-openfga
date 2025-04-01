@@ -26,9 +26,9 @@ import (
 
 type none struct{}
 
-var _ x.OpenFGA[none] = (*clientWrapper)(nil)
+var _ x.OpenFGA = (*clientWrapper)(nil)
 
-func wrap(c service.Client) x.OpenFGA[none] {
+func wrap(c service.Client) x.OpenFGA {
 	return &clientWrapper{c: c, wrapper: &wrapper{c: c}}
 }
 
@@ -37,7 +37,7 @@ type clientWrapper struct {
 	c service.Client
 }
 
-func (c *clientWrapper) WithTx(_ none) x.Tx {
+func (c *clientWrapper) WithTx(_ any) x.Tx {
 	panic("unsupported")
 }
 

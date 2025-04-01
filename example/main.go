@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/fullstorydev/grpchan/inprocgrpc"
-	"github.com/openfga/openfga/pkg/server"
-	"github.com/openfga/openfga/pkg/storage/memory"
+	protodb2 "go.linka.cloud/protodb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -17,6 +16,7 @@ import (
 	"go.linka.cloud/go-openfga"
 	pb "go.linka.cloud/go-openfga/example/pb"
 	"go.linka.cloud/go-openfga/interceptors"
+	"go.linka.cloud/go-openfga/storage/protodb"
 )
 
 //go:embed base.fga
@@ -56,8 +56,8 @@ func main() {
 	defer cancel()
 
 	// create the in-memory openfga server
-	mem := memory.New()
-	f, err := openfga.New(server.WithDatastore(mem))
+	ds, err := protodb.New(ctx, protodb2.WithInMemory(true))
+	f, err := openfga.New(ds)
 	if err != nil {
 		log.Fatal(err)
 	}
