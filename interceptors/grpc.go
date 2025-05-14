@@ -106,10 +106,7 @@ func (f *fga) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 func (f *fga) StreamServerInterceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := openfga.Context(ss.Context(), f.model)
-		if err := f.check(ss.Context(), info.FullMethod, nil); err != nil {
-			return err
-		}
-		return handler(srv, &wrapper{ctx: ctx, ServerStream: ss})
+		return handler(srv, &wrapper{ctx: ctx, ServerStream: ss, method: info.FullMethod, f: f})
 	}
 }
 
@@ -149,9 +146,21 @@ func (f *fga) check(ctx context.Context, fullMethod string, req any) error {
 
 type wrapper struct {
 	grpc.ServerStream
-	ctx context.Context
+	ctx    context.Context
+	method string
+	f      *fga
 }
 
 func (w *wrapper) Context() context.Context {
 	return w.ctx
+}
+
+func (w *wrapper) RecvMsg(m any) error {
+	if err := w.ServerStream.RecvMsg(m); err != nil {
+		return err
+	}
+	if err := w.f.check(w.ctx, w.method, m); err != nil {
+		return err
+	}
+	return nil
 }
