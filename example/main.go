@@ -56,7 +56,7 @@ func main() {
 	defer cancel()
 
 	// create the in-memory openfga server
-	ds, err := protodb.New(ctx, protodb2.WithInMemory(true))
+	ds, err := protodb.New(ctx, true, protodb2.WithInMemory(true))
 	f, err := openfga.New(ds)
 	if err != nil {
 		log.Fatal(err)

@@ -18,7 +18,7 @@ func TestServer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db, err := protodb.New(ctx, protodb2.WithInMemory(true))
+	db, err := protodb.New(ctx, true, protodb2.WithInMemory(true))
 	require.NoError(t, err)
 	defer db.Close()
 	f, err := openfga.New(db)
@@ -98,7 +98,7 @@ func TestWithTx(t *testing.T) {
 	db, err := protodb2.Open(ctx, protodb2.WithInMemory(true))
 	require.NoError(t, err)
 	defer db.Close()
-	fdb, err := protodb.NewWithClient(ctx, db)
+	fdb, err := protodb.NewWithClient(ctx, db, true)
 	require.NoError(t, err)
 	defer db.Close()
 	f, err := openfga.New(fdb)

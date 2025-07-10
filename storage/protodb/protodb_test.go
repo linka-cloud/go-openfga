@@ -30,7 +30,7 @@ func TestStorage(t *testing.T) {
 	db, err := protodb.Open(ctx, protodb.WithInMemory(true))
 	require.NoError(t, err)
 	defer db.Close()
-	ds, err := NewWithClient(ctx, db)
+	ds, err := NewWithClient(ctx, db, false)
 	require.NoError(t, err)
 	test.RunAllTests(t, ds)
 }

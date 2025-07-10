@@ -55,7 +55,7 @@ func withTx(ctx context.Context, p *pdb, fn func(ctx context.Context, txn *tx) e
 		return err
 	}
 	defer maybeClose(ctx, txn)()
-	if err = fn(ctx, &tx{tx: txn}); err != nil {
+	if err = fn(ctx, &tx{tx: txn, skipChanges: p.skipChanges}); err != nil {
 		return err
 	}
 	if err := maybeCommit(ctx, txn); err != nil {
@@ -71,7 +71,7 @@ func withTx2[R any](ctx context.Context, p *pdb, fn func(ctx context.Context, tx
 		return o1, err
 	}
 	defer maybeClose(ctx, txn)()
-	o1, err = fn(ctx, &tx{tx: txn})
+	o1, err = fn(ctx, &tx{tx: txn, skipChanges: p.skipChanges})
 	if err != nil {
 		return o1, err
 	}
@@ -91,7 +91,7 @@ func withTx3[R any, T any](ctx context.Context, p *pdb, fn func(ctx context.Cont
 		return o1, o2, err
 	}
 	defer maybeClose(ctx, txn)()
-	o1, o2, err = fn(ctx, &tx{tx: txn})
+	o1, o2, err = fn(ctx, &tx{tx: txn, skipChanges: p.skipChanges})
 	if err != nil {
 		return o1, o2, err
 	}

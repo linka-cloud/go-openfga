@@ -43,31 +43,32 @@ const (
 
 var _ storage.OpenFGADatastore = (*pdb)(nil)
 
-func New(ctx context.Context, option ...protodb.Option) (xstorage.Datastore, error) {
+func New(ctx context.Context, skipChanges bool, option ...protodb.Option) (xstorage.Datastore, error) {
 	db, err := protodb.Open(ctx, option...)
 	if err != nil {
 		return nil, err
 	}
-	return newWithClient(ctx, db, false)
+	return newWithClient(ctx, db, false, skipChanges)
 
 }
 
-func NewWithClient(ctx context.Context, db protodb.Client) (xstorage.Datastore, error) {
-	return newWithClient(ctx, db, true)
+func NewWithClient(ctx context.Context, db protodb.Client, skipChanges bool) (xstorage.Datastore, error) {
+	return newWithClient(ctx, db, true, skipChanges)
 }
 
-func newWithClient(ctx context.Context, db protodb.Client, external bool) (xstorage.Datastore, error) {
+func newWithClient(ctx context.Context, db protodb.Client, external bool, skipChanges bool) (xstorage.Datastore, error) {
 	for _, v := range []proto.Message{&openfgav1.Store{}, &pbv1.Tuple{}, &pbv1.Assertions{}, &pbv1.Change{}} {
 		if err := db.Register(ctx, v.ProtoReflect().Descriptor().ParentFile()); err != nil {
 			return nil, err
 		}
 	}
-	return &pdb{db: db, external: external}, nil
+	return &pdb{db: db, external: external, skipChanges: skipChanges}, nil
 }
 
 type pdb struct {
-	db       protodb.Client
-	external bool
+	db          protodb.Client
+	external    bool
+	skipChanges bool
 }
 
 func (p *pdb) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, options storage.ReadOptions) (storage.TupleIterator, error) {
@@ -215,8 +216,9 @@ func (p *pdb) IsReady(ctx context.Context) (storage.ReadinessStatus, error) {
 }
 
 type tx struct {
-	mu sync.Mutex
-	tx protodb.Tx
+	mu          sync.Mutex
+	tx          protodb.Tx
+	skipChanges bool
 }
 
 func (t *tx) Unwrap() any {
@@ -340,6 +342,7 @@ func (t *tx) ReadStartingWithUser(ctx context.Context, store string, filter stor
 func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	skip := t.skipChanges
 	tx := typed.NewTx[pbv1.Tuple](t.tx)
 	for _, v := range w {
 		t := (&pbv1.Tuple{StoreId: store, TupleKey: v, CreatedAt: timestamppb.Now()}).SetKey()
@@ -354,10 +357,13 @@ func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w stora
 		if t.TupleKey.Condition != nil && v.Condition.Context == nil {
 			t.TupleKey.Condition.Context = &structpb.Struct{}
 		}
-		if _, err := tx.Raw().Set(ctx, pbv1.NewWriteChange(store, t)); err != nil {
+		if _, err := tx.Set(ctx, t); err != nil {
 			return err
 		}
-		if _, err := tx.Set(ctx, t); err != nil {
+		if skip {
+			continue
+		}
+		if _, err := tx.Raw().Set(ctx, pbv1.NewWriteChange(store, t)); err != nil {
 			return err
 		}
 	}
@@ -372,6 +378,9 @@ func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w stora
 		}
 		if err := tx.Delete(ctx, t); err != nil {
 			return err
+		}
+		if skip {
+			continue
 		}
 		got[0].TupleKey.Condition = nil
 		if _, err := tx.Raw().Set(ctx, pbv1.NewDeleteChange(store, got[0])); err != nil {
