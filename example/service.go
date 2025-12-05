@@ -91,6 +91,16 @@ func (r *service) List(ctx context.Context, _ *pb.ListRequest) (*pb.ListResponse
 	return res, nil
 }
 
+func (r *service) AddSub(ctx context.Context, req *pb.AddSubRequest) (*pb.AddSubResponse, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (r *service) ReadSub(ctx context.Context, req *pb.ReadSubRequest) (*pb.ReadSubResponse, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (r *service) Watch(_ *pb.WatchRequest, server grpc.ServerStreamingServer[pb.Event]) error {
 	ch := r.pubsub.Subscribe()
 	defer r.pubsub.Evict(ch)

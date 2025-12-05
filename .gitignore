@@ -1,3 +1,4 @@
 .idea
 scratch
 /protoc-gen-go-openfga
+.DS_Store

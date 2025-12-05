@@ -71,21 +71,22 @@ type pdb struct {
 	skipChanges bool
 }
 
-func (p *pdb) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, options storage.ReadOptions) (storage.TupleIterator, error) {
+// Read(ctx context.Context, store string, filter ReadFilter, options ReadOptions) (TupleIterator, error)
+func (p *pdb) Read(ctx context.Context, store string, filter storage.ReadFilter, options storage.ReadOptions) (storage.TupleIterator, error) {
 	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (storage.TupleIterator, error) {
-		return tx.Read(ctx, store, tupleKey, options)
+		return tx.Read(ctx, store, filter, options)
 	}, protodb.WithReadOnly())
 }
 
-func (p *pdb) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
+func (p *pdb) ReadPage(ctx context.Context, store string, filter storage.ReadFilter, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
 	return withTx3(ctx, p, func(ctx context.Context, tx *tx) ([]*openfgav1.Tuple, string, error) {
-		return tx.ReadPage(ctx, store, tupleKey, opts)
+		return tx.ReadPage(ctx, store, filter, opts)
 	}, protodb.WithReadOnly())
 }
 
-func (p *pdb) ReadUserTuple(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, options storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
+func (p *pdb) ReadUserTuple(ctx context.Context, store string, filter storage.ReadUserTupleFilter, options storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
 	return withTx2(ctx, p, func(ctx context.Context, tx *tx) (*openfgav1.Tuple, error) {
-		return tx.ReadUserTuple(ctx, store, tupleKey, options)
+		return tx.ReadUserTuple(ctx, store, filter, options)
 	}, protodb.WithReadOnly())
 }
 
@@ -101,9 +102,9 @@ func (p *pdb) ReadStartingWithUser(ctx context.Context, store string, filter sto
 	}, protodb.WithReadOnly())
 }
 
-func (p *pdb) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes) error {
+func (p *pdb) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes, opts ...storage.TupleWriteOption) error {
 	return withTx(ctx, p, func(ctx context.Context, tx *tx) error {
-		return tx.Write(ctx, store, d, w)
+		return tx.Write(ctx, store, d, w, opts...)
 	})
 }
 
@@ -233,28 +234,26 @@ func (t *tx) MaxTypesPerAuthorizationModel() int {
 	return maxTypesPerAuthorizationModel
 }
 
-func (t *tx) Read(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadOptions) (storage.TupleIterator, error) {
+func (t *tx) Read(ctx context.Context, store string, filter storage.ReadFilter, _ storage.ReadOptions) (storage.TupleIterator, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(makeFilter(store, tupleKey.User, tupleKey.Relation, tupleKey.Object)))
+	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, protodb.WithFilter(makeFilter(store, filter.User, filter.Relation, filter.Object)))
 	if err != nil {
 		return nil, err
 	}
 	return storage.NewStaticTupleIterator(toTuple(ts)), nil
 }
 
-func (t *tx) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
+func (t *tx) ReadPage(ctx context.Context, store string, filter storage.ReadFilter, opts storage.ReadPageOptions) ([]*openfgav1.Tuple, string, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	tk, err := parseToken(opts.Pagination.From)
 	if err != nil {
 		return nil, "", err
 	}
-	o := []protodb.GetOption{protodb.WithPaging(&protodb.Paging{Offset: tk.Offset, Limit: uint64(opts.Pagination.PageSize), Token: tk.Continuation})}
-	if tupleKey != nil {
-		o = append(o, protodb.WithFilter(makeFilter(store, tupleKey.User, tupleKey.Relation, tupleKey.Object)))
-	} else {
-		o = append(o, protodb.WithFilter(protodb.Where("key").StringHasPrefix(pbv1.TuplePrefix(store))))
+	o := []protodb.GetOption{
+		protodb.WithPaging(&protodb.Paging{Offset: tk.Offset, Limit: uint64(opts.Pagination.PageSize), Token: tk.Continuation}),
+		protodb.WithFilter(makeFilter(store, filter.User, filter.Relation, filter.Object)),
 	}
 	ts, info, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{}, o...)
 	if err != nil {
@@ -266,10 +265,10 @@ func (t *tx) ReadPage(ctx context.Context, store string, tupleKey *openfgav1.Tup
 	return toTuple(ts), newToken(info.Token, tk.Offset+uint64(len(ts))).String(), nil
 }
 
-func (t *tx) ReadUserTuple(ctx context.Context, store string, tupleKey *openfgav1.TupleKey, _ storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
+func (t *tx) ReadUserTuple(ctx context.Context, store string, filter storage.ReadUserTupleFilter, _ storage.ReadUserTupleOptions) (*openfgav1.Tuple, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{Key: pbv1.TupleKey(store, tupleKey)})
+	ts, _, err := typed.NewTx[pbv1.Tuple](t.tx).Get(ctx, &pbv1.Tuple{Key: pbv1.TupleKey(store, &openfgav1.TupleKey{Object: filter.Object, User: filter.User, Relation: filter.Relation})})
 	if err != nil {
 		return nil, err
 	}
@@ -339,9 +338,13 @@ func (t *tx) ReadStartingWithUser(ctx context.Context, store string, filter stor
 	return storage.NewStaticTupleIterator(toTuple(ts)), nil
 }
 
-func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes) error {
+func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w storage.Writes, opts ...storage.TupleWriteOption) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	var o storage.TupleWriteOptions
+	for _, v := range opts {
+		v(&o)
+	}
 	skip := t.skipChanges
 	tx := typed.NewTx[pbv1.Tuple](t.tx)
 	for _, v := range w {
@@ -351,7 +354,13 @@ func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w stora
 			return err
 		}
 		if len(got) != 0 {
-			return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_WRITE)
+			if o.OnDuplicateInsert == storage.OnDuplicateInsertError {
+				return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_WRITE)
+			}
+			if !proto.Equal(v, got[0].TupleKey) {
+				return storage.ErrTransactionalWriteFailed
+			}
+			continue
 		}
 		// don't know why the tests want that...
 		if t.TupleKey.Condition != nil && v.Condition.Context == nil {
@@ -374,7 +383,10 @@ func (t *tx) Write(ctx context.Context, store string, d storage.Deletes, w stora
 			return err
 		}
 		if len(got) == 0 {
-			return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_DELETE)
+			if o.OnMissingDelete == storage.OnMissingDeleteError {
+				return storage.InvalidWriteInputError(v, openfgav1.TupleOperation_TUPLE_OPERATION_DELETE)
+			}
+			continue
 		}
 		if err := tx.Delete(ctx, t); err != nil {
 			return err
