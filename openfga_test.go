@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.linka.cloud/grpc-toolkit/logger"
 	protodb2 "go.linka.cloud/protodb"
 
 	"go.linka.cloud/go-openfga"
@@ -95,7 +96,7 @@ func TestWithTx(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db, err := protodb2.Open(ctx, protodb2.WithInMemory(true))
+	db, err := protodb2.Open(ctx, protodb2.WithInMemory(true), protodb2.WithLogger(logger.C(ctx).WithOffset(1)))
 	require.NoError(t, err)
 	defer db.Close()
 	fdb, err := protodb.NewWithClient(ctx, db, true)
