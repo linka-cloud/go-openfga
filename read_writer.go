@@ -27,10 +27,12 @@ import (
 )
 
 type rw struct {
-	c   openfgav1.OpenFGAServiceServer
-	m   *openfgav1.AuthorizationModel
-	mid string
-	sid string
+	c           openfgav1.OpenFGAServiceServer
+	m           *openfgav1.AuthorizationModel
+	mid         string
+	sid         string
+	onDuplicate string
+	onMissing   string
 }
 
 func (m *rw) Check(ctx context.Context, object, relation, user string, contextKVs ...any) (bool, error) {
@@ -194,7 +196,7 @@ func (m *rw) WriteTuples(ctx context.Context, keys ...*openfgav1.TupleKey) error
 	_, err := m.c.Write(ctx, &openfgav1.WriteRequest{
 		StoreId:              m.sid,
 		AuthorizationModelId: m.mid,
-		Writes:               &openfgav1.WriteRequestWrites{TupleKeys: keys},
+		Writes:               &openfgav1.WriteRequestWrites{TupleKeys: keys, OnDuplicate: m.onDuplicate},
 	})
 	return err
 }
@@ -221,7 +223,18 @@ func (m *rw) DeleteTuples(ctx context.Context, keys ...*openfgav1.TupleKey) erro
 	_, err := m.c.Write(ctx, &openfgav1.WriteRequest{
 		StoreId:              m.sid,
 		AuthorizationModelId: m.mid,
-		Deletes:              &openfgav1.WriteRequestDeletes{TupleKeys: d},
+		Deletes:              &openfgav1.WriteRequestDeletes{TupleKeys: d, OnMissing: m.onMissing},
 	})
 	return err
+}
+
+func (m *rw) clone() *rw {
+	return &rw{
+		c:           m.c,
+		m:           m.m,
+		mid:         m.mid,
+		sid:         m.sid,
+		onDuplicate: m.onDuplicate,
+		onMissing:   m.onMissing,
+	}
 }

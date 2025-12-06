@@ -44,17 +44,22 @@ type TupleReader interface {
 	CheckTuple(ctx context.Context, key *openfgav1.TupleKey, contextKVs ...any) (bool, error)
 }
 
-type TupleWriter interface {
+type TupleWriter[T any] interface {
 	Write(ctx context.Context, object, relation, user string) error
 	WriteWithCondition(ctx context.Context, object, relation, user string, condition string, kv ...any) error
 	WriteTuples(context.Context, ...*openfgav1.TupleKey) error
 	Delete(ctx context.Context, object, relation, user string) error
 	DeleteTuples(context.Context, ...*openfgav1.TupleKey) error
+
+	OnMissingIgnore() T
+	OnMissingError() T
+	OnDuplicateIgnore() T
+	OnDuplicateError() T
 }
 
 type Model interface {
 	TupleReader
-	TupleWriter
+	TupleWriter[Model]
 
 	ID() string
 	Store() Store
@@ -67,7 +72,8 @@ type Model interface {
 
 type Tx interface {
 	TupleReader
-	TupleWriter
+	TupleWriter[Tx]
+
 	Commit(ctx context.Context) error
 	Close() error
 }

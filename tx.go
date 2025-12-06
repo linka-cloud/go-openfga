@@ -25,10 +25,41 @@ type tx struct {
 	*rw
 }
 
+func (t *tx) OnMissingIgnore() Tx {
+	t2 := t.clone()
+	t2.rw.onMissing = onMissingIgnore
+	return t2
+}
+
+func (t *tx) OnMissingError() Tx {
+	t2 := t.clone()
+	t2.rw.onMissing = onMissingError
+	return t2
+}
+
+func (t *tx) OnDuplicateIgnore() Tx {
+	t2 := t.clone()
+	t2.rw.onDuplicate = onDuplicateIgnore
+	return t2
+}
+
+func (t *tx) OnDuplicateError() Tx {
+	t2 := t.clone()
+	t2.rw.onDuplicate = onDuplicateError
+	return t2
+}
+
 func (t *tx) Commit(ctx context.Context) error {
 	return t.c.Commit(ctx)
 }
 
 func (t *tx) Close() error {
 	return t.c.Close()
+}
+
+func (t *tx) clone() *tx {
+	return &tx{
+		c:  t.c,
+		rw: t.rw.clone(),
+	}
 }

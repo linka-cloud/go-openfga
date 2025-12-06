@@ -29,6 +29,13 @@ import (
 
 const SchemaVersion = "1.2"
 
+const (
+	onDuplicateError  = "error"
+	onDuplicateIgnore = "ignore"
+	onMissingError    = "error"
+	onMissingIgnore   = "ignore"
+)
+
 type model struct {
 	s *store
 	c x.OpenFGA
@@ -70,6 +77,38 @@ func (m *model) Store() Store {
 
 func (m *model) Show() (string, error) {
 	return parser.TransformJSONProtoToDSL(m.m, parser.WithIncludeSourceInformation(true))
+}
+
+func (m *model) OnDuplicateIgnore() Model {
+	m2 := m.clone()
+	m2.onDuplicate = onDuplicateIgnore
+	return m2
+}
+
+func (m *model) OnDuplicateError() Model {
+	m2 := m.clone()
+	m2.onDuplicate = onDuplicateError
+	return m2
+}
+
+func (m *model) OnMissingIgnore() Model {
+	m2 := m.clone()
+	m2.onMissing = onMissingIgnore
+	return m2
+}
+
+func (m *model) OnMissingError() Model {
+	m2 := m.clone()
+	m2.onMissing = onMissingError
+	return m2
+}
+
+func (m *model) clone() *model {
+	return &model{
+		s:  m.s,
+		c:  m.c,
+		rw: m.rw.clone(),
+	}
 }
 
 func makeContext(kv ...any) (*structpb.Struct, error) {

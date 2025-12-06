@@ -90,6 +90,9 @@ func TestServer(t *testing.T) {
 	ok, err = m.Check(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.Owner, tests.User.Ref("user3"))
 	require.NoError(t, err)
 	assert.False(t, ok)
+
+	require.NoError(t, m.OnMissingIgnore().Delete(ctx, tests.Doc.Ref("noop"), tests.DocRelations.Viewer, tests.User.Ref("noop")))
+	require.Error(t, m.OnMissingError().Delete(ctx, tests.Doc.Ref("noop"), tests.DocRelations.Viewer, tests.User.Ref("noop")))
 }
 
 func TestWithTx(t *testing.T) {
@@ -115,9 +118,12 @@ func TestWithTx(t *testing.T) {
 	defer txn.Close()
 	tx := m.WithTx(txn)
 	require.NoError(t, tx.Write(ctx, tests.Doc.Ref("doc1"), tests.DocRelations.Owner, tests.User.Ref("user1")))
+	require.NoError(t, tx.OnMissingIgnore().Delete(ctx, tests.Doc.Ref("noop"), tests.DocRelations.Viewer, tests.User.Ref("noop")))
+	require.Error(t, tx.OnMissingError().Delete(ctx, tests.Doc.Ref("noop"), tests.DocRelations.Viewer, tests.User.Ref("noop")))
 	require.NoError(t, txn.Commit(ctx))
 	require.Error(t, tx.Commit(ctx))
 	ts, err := m.Read(ctx, "", "", "")
 	require.NoError(t, err)
 	require.Len(t, ts, 1)
+
 }
