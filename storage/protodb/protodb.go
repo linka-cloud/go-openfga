@@ -205,6 +205,12 @@ func (p *pdb) Tx(ctx context.Context, opts ...xstorage.TxOption) (xstorage.Tx, e
 }
 
 func (p *pdb) WithTx(txn any) xstorage.Tx {
+	type typedTxRaw interface {
+		Raw() protodb.Tx
+	}
+	if tt, ok := txn.(typedTxRaw); ok {
+		return &tx{tx: tt.Raw()}
+	}
 	t, ok := txn.(protodb.Tx)
 	if !ok {
 		panic(fmt.Sprintf("invalid transaction type %T", txn))
