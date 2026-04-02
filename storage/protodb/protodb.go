@@ -293,7 +293,7 @@ func (t *tx) ReadUsersetTuples(ctx context.Context, store string, filter storage
 		for _, v := range filter.AllowedUserTypeRestrictions {
 			f2 := protodb.Where("key").StringHasPrefix(fmt.Sprintf("%s%s:", prefix, v.Type))
 			if v.GetRelation() != "" {
-				f2.And("key").StringHasSuffix(fmt.Sprintf("#%s", v.GetRelation()))
+				f2.AndWhere("key").StringHasSuffix(fmt.Sprintf("#%s", v.GetRelation()))
 			}
 			if f == nil {
 				f = f2
@@ -331,9 +331,9 @@ func (t *tx) ReadStartingWithUser(ctx context.Context, store string, filter stor
 				s = fmt.Sprintf("#%s@%s#%s", filter.Relation, v.Object, v.Relation)
 			}
 			if f == nil {
-				f = pf.And("key").StringHasSuffix(s)
+				f = pf.AndWhere("key").StringHasSuffix(s)
 			} else {
-				f.Or(pf.And("key").StringHasSuffix(s))
+				f.Or(pf.AndWhere("key").StringHasSuffix(s))
 			}
 		}
 	}
@@ -548,7 +548,7 @@ func (t *tx) ListStores(ctx context.Context, opts storage.ListStoresOptions) ([]
 	}
 	if len(opts.IDs) != 0 {
 		if f != nil {
-			f.And("id").StringIN(opts.IDs...)
+			f.AndWhere("id").StringIN(opts.IDs...)
 		} else {
 			f = protodb.Where("id").StringIN(opts.IDs...)
 		}
@@ -591,14 +591,14 @@ func (t *tx) ReadChanges(ctx context.Context, store string, filter storage.ReadC
 	f := protodb.Where("key").StringHasPrefix(store + "/")
 	// we do not set the horizontal offset in the filter because it may change
 	if filter.ObjectType != "" {
-		f = f.And("change.tuple_key.object").StringHasPrefix(filter.ObjectType + ":")
+		f = f.AndWhere("change.tuple_key.object").StringHasPrefix(filter.ObjectType + ":")
 	}
 	from := store + "/" + opts.Pagination.From
 	if opts.Pagination.From != "" {
 		if opts.SortDesc {
-			f = f.And("key").StringInf(from)
+			f = f.AndWhere("key").StringInf(from)
 		} else {
-			f = f.And("key").StringSup(from)
+			f = f.AndWhere("key").StringSup(from)
 		}
 	}
 	o := []protodb.GetOption{
@@ -694,7 +694,7 @@ func makeFilter(storeID, user, relation, object string) filters.FieldFilterer {
 		if relation != "" {
 			suffix = "#" + relation + suffix
 		}
-		f.And("key").StringHasSuffix(suffix)
+		f.AndWhere("key").StringHasSuffix(suffix)
 	}
 	return f
 }
