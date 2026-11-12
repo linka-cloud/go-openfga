@@ -17,6 +17,7 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -102,6 +103,9 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 			for _, v := range t {
 				out = append(out, v)
 			}
+			slices.SortFunc(out, func(a, b Type) int {
+				return strings.Compare(a.Name, b.Name)
+			})
 			return out
 		},
 		"access": m.access,
