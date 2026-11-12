@@ -1,7 +1,6 @@
 package openfga_test
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -16,8 +15,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	db, err := protodb.New(ctx, true, protodb2.WithInMemory(true))
 	require.NoError(t, err)
@@ -96,8 +94,7 @@ func TestServer(t *testing.T) {
 }
 
 func TestWithTx(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	db, err := protodb2.Open(ctx, protodb2.WithInMemory(true), protodb2.WithLogger(logger.C(ctx).WithOffset(1)))
 	require.NoError(t, err)

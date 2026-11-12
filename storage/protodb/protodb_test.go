@@ -15,7 +15,6 @@
 package protodb
 
 import (
-	"context"
 	"testing"
 
 	"github.com/openfga/openfga/pkg/storage/test"
@@ -25,8 +24,7 @@ import (
 )
 
 func TestStorage(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	db, err := protodb.Open(ctx, protodb.WithInMemory(true), protodb.WithLogger(logger.C(ctx).WithOffset(1)))
 	require.NoError(t, err)

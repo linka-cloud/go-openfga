@@ -43,7 +43,7 @@ func TestDeclarationOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	var first string
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		var output bytes.Buffer
 		pgs.Init(pgs.ProtocInput(bytes.NewReader(input)), pgs.ProtocOutput(&output)).
 			RegisterModule(FGA()).

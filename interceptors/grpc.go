@@ -94,7 +94,7 @@ func (f *fga) Register(fqn string, obj CheckFunc) {
 }
 
 func (f *fga) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		ctx = openfga.Context(ctx, f.model)
 		if err := f.check(ctx, info.FullMethod, req); err != nil {
 			return nil, err
@@ -104,14 +104,14 @@ func (f *fga) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 }
 
 func (f *fga) StreamServerInterceptor() grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := openfga.Context(ss.Context(), f.model)
 		return handler(srv, &wrapper{ctx: ctx, ServerStream: ss, method: info.FullMethod, f: f})
 	}
 }
 
 func (f *fga) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
-	return func(ctx context.Context, method string, req interface{}, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	return func(ctx context.Context, method string, req any, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		if err := f.check(ctx, method, req); err != nil {
 			return err
 		}

@@ -132,7 +132,7 @@ func (m *rw) ListUsers(ctx context.Context, object, relation, userTyp string, co
 
 func (m *rw) ListRelations(ctx context.Context, object, user string, relations ...string) ([]string, error) {
 	if len(relations) == 0 {
-		objectType := strings.Split(object, ":")[0]
+		objectType, _, _ := strings.Cut(object, ":")
 		for _, v := range m.m.TypeDefinitions {
 			if v.Type != objectType {
 				continue
